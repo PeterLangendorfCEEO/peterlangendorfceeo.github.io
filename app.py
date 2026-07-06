@@ -6,7 +6,6 @@ import json
 
 ENGINE_FAILURE_CHANCE = 10
 
-# Mirrors legoeducation's MOTOR_MOVE_DIRECTION_* constants.
 DIR_CW = 0
 DIR_CCW = 1
 
@@ -18,16 +17,22 @@ def print_term(message, color="lime"):
 # --- UI State Management ---
 def add_move(move):
     listbox = document.querySelector("#move-listbox")
-    option = document.createElement("option")
-    option.text = move
-    option.value = move
-    listbox.add(option)
+    
+    # Create the new custom list element
+    item = document.createElement("div")
+    item.className = "list-item"
+    item.draggable = True
+    item.innerText = move.lower()
+    
+    listbox.appendChild(item)
     save_state()
 
-def remove_last(event):
-    listbox = document.querySelector("#move-listbox")
-    if listbox.options.length > 0:
-        listbox.remove(listbox.options.length - 1)
+def remove_selected(event):
+    # Now targets the highlighted element instead of just the last one in the list
+    selected_items = document.querySelectorAll(".list-item.selected")
+    if selected_items.length > 0:
+        for i in range(selected_items.length):
+            selected_items.item(i).remove()
         save_state()
 
 def clear_all(event):
@@ -38,7 +43,7 @@ document.querySelector("#btn-forward").onclick = lambda e: add_move("forward")
 document.querySelector("#btn-back").onclick = lambda e: add_move("back")
 document.querySelector("#btn-left").onclick = lambda e: add_move("left")
 document.querySelector("#btn-right").onclick = lambda e: add_move("right")
-document.querySelector("#btn-remove").onclick = remove_last
+document.querySelector("#btn-remove").onclick = remove_selected
 document.querySelector("#btn-clear").onclick = clear_all
 
 def save_state(*args):
@@ -51,7 +56,10 @@ def save_state(*args):
         "backward_speed": document.querySelector("#bck_spd").value,
     }
     listbox = document.querySelector("#move-listbox")
-    moves = [listbox.options.item(i).value for i in range(listbox.options.length)]
+    
+    # Read the custom div's innerText
+    moves = [listbox.children.item(i).innerText.lower() for i in range(listbox.children.length)]
+    
     window.localStorage.setItem("cyber_settings", json.dumps(settings))
     window.localStorage.setItem("cyber_moves", json.dumps(moves))
 
@@ -71,11 +79,18 @@ def load_state():
         for move in moves:
             add_move(move)
 
+# Force Python to re-save the move sequence whenever a drag-and-drop ends
+proxy_drag = create_proxy(save_state)
+document.querySelector("#move-listbox").addEventListener("dragend", proxy_drag)
+
+
 # --- Hardware Execution ---
 async def execute_sequence(event):
     save_state()
     listbox = document.querySelector("#move-listbox")
-    move_set = [listbox.options.item(i).value for i in range(listbox.options.length)]
+    
+    # Read the text directly out of the reordered list
+    move_set = [listbox.children.item(i).innerText.lower() for i in range(listbox.children.length)]
     settings = json.loads(window.localStorage.getItem("cyber_settings"))
 
     print_term("Triggering Web Bluetooth Pairing Menu...", color="yellow")
@@ -144,4 +159,6 @@ proxy = create_proxy(lambda e: asyncio.ensure_future(execute_sequence(e)))
 document.querySelector("#btn-run").addEventListener("click", proxy)
 
 load_state()
+
+# Hide the boot screen once Python is fully ready
 document.getElementById("loading-screen").classList.add("fade-out")
