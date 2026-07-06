@@ -78,7 +78,7 @@ window.legoBluetooth = {
         ]);
 
         try {
-            await this.characteristic.writeValue(payload);
+            await this.characteristic.writeValueWithoutResponse(payload);
         } catch (error) {
             console.error("Failed to write motor frame:", error);
         }

@@ -100,30 +100,37 @@ async def execute_sequence(event):
 
         print_term(f"Executing: {move.upper()}")
 
+        # THE FIX: Added 'await' to all runMotor calls to prevent GATT traffic jams
         if move == "forward":
-            if not left_failed: window.legoBluetooth.runMotor("LEFT", int(settings["forward_speed"]), 864)
-            if not right_failed: window.legoBluetooth.runMotor("RIGHT", -int(settings["forward_speed"]), 864) # Inverse polarity for right motor
+            if not left_failed: 
+                await window.legoBluetooth.runMotor("LEFT", int(settings["forward_speed"]), 864)
+            if not right_failed: 
+                await window.legoBluetooth.runMotor("RIGHT", -int(settings["forward_speed"]), 864) 
             
         elif move == "back":
-            if not left_failed: window.legoBluetooth.runMotor("LEFT", -int(settings["backward_speed"]), 900)
-            if not right_failed: window.legoBluetooth.runMotor("RIGHT", int(settings["backward_speed"]), 900)
+            if not left_failed: 
+                await window.legoBluetooth.runMotor("LEFT", -int(settings["backward_speed"]), 900)
+            if not right_failed: 
+                await window.legoBluetooth.runMotor("RIGHT", int(settings["backward_speed"]), 900)
             
         elif move == "left":
-            # To turn left, spin left motor backwards, right motor forwards
-            turn_degrees = abs(int(settings["left_angle"])) * 3 # Arbitrary ratio to map UI angle to motor rotation
+            turn_degrees = abs(int(settings["left_angle"])) * 3 
             speed = int(settings["left_speed"])
-            if not left_failed: window.legoBluetooth.runMotor("LEFT", -speed, turn_degrees)
-            if not right_failed: window.legoBluetooth.runMotor("RIGHT", -speed, turn_degrees)
+            if not left_failed: 
+                await window.legoBluetooth.runMotor("LEFT", -speed, turn_degrees)
+            if not right_failed: 
+                await window.legoBluetooth.runMotor("RIGHT", -speed, turn_degrees)
             
         elif move == "right":
-            # To turn right, spin left motor forwards, right motor backwards
             turn_degrees = abs(int(settings["right_angle"])) * 3
             speed = int(settings["right_speed"])
-            if not left_failed: window.legoBluetooth.runMotor("LEFT", speed, turn_degrees)
-            if not right_failed: window.legoBluetooth.runMotor("RIGHT", speed, turn_degrees)
+            if not left_failed: 
+                await window.legoBluetooth.runMotor("LEFT", speed, turn_degrees)
+            if not right_failed: 
+                await window.legoBluetooth.runMotor("RIGHT", speed, turn_degrees)
 
         # Wait for physical execution before sending the next command
-        await asyncio.sleep(3) 
+        await asyncio.sleep(3)
 
     print_term("Robot move sequence complete!")
 
