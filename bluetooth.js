@@ -52,10 +52,10 @@ window.legoBluetooth = {
     runMotor: async function(portName, speed, degrees) {
         if (!this.characteristic) return;
 
-        // Map "LEFT" and "RIGHT" to physical hub ports A (0x00) and B (0x01)
+        // Maps "LEFT" to Port 0x00 and "RIGHT" to Port 0x01
         const portId = portName === 'LEFT' ? 0x00 : 0x01;
         
-        // Convert degrees to a 32-bit little-endian array
+        // Converts the degree integer into a 4-byte little-endian array
         const degArray = [
             degrees & 0xFF,
             (degrees >> 8) & 0xFF,
@@ -63,23 +63,23 @@ window.legoBluetooth = {
             (degrees >> 24) & 0xFF
         ];
 
-        // Raw LWP3 Port Output Command
         const payload = new Uint8Array([
             0x0E,           // 1. Length of the message (14 bytes)
             0x00,           // 2. Hub ID
             0x81,           // 3. Command Type: Port Output Command
             portId,         // 4. Port to address
-            0x11,           // 5. Startup and Completion Info (Execute immediately)
+            0x10,           // 5. THE FIX: 0x10 = Execute Immediately, NO Feedback
             0x0B,           // 6. Subcommand: WriteDirectModeData (Turn Degrees)
             ...degArray,    // 7, 8, 9, 10. The 4 bytes representing the degrees
-            speed & 0xFF,   // 11. Speed (-100 to 100, masked safely to an 8-bit integer)
+            speed & 0xFF,   // 11. Speed (-100 to 100)
             100,            // 12. Max Power (0-100)
             0x7F,           // 13. End State (0x7F = Brake motor when done)
-            0x00            // 14. THE MISSING BYTE: Use Profile (0x00 = No acceleration profile)
+            0x00            // 14. Use Profile (0x00 = No acceleration profile)
         ]);
 
         try {
-            await this.characteristic.writeValueWithoutResponse(payload);
+            // THE FIX: Restored the standard, safe writeValue function
+            await this.characteristic.writeValue(payload);
         } catch (error) {
             console.error("Failed to write motor frame:", error);
         }
