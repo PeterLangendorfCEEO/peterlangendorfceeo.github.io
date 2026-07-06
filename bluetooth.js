@@ -65,16 +65,17 @@ window.legoBluetooth = {
 
         // Raw LWP3 Port Output Command
         const payload = new Uint8Array([
-            0x0E,           // Length of the message (14 bytes)
-            0x00,           // Hub ID
-            0x81,           // Command Type: Port Output Command
-            portId,         // Port to address
-            0x11,           // Startup and Completion Info (Execute immediately)
-            0x0B,           // Subcommand: WriteDirectModeData (Turn Degrees)
-            ...degArray,    // The 4 bytes representing the degrees
-            speed < 0 ? 256 + speed : speed, // Speed (Handling negative values)
-            100,            // Max Power (0-100)
-            0x00            // End State (0x00 = Float/Coast, 0x7F = Brake)
+            0x0E,           // 1. Length of the message (14 bytes)
+            0x00,           // 2. Hub ID
+            0x81,           // 3. Command Type: Port Output Command
+            portId,         // 4. Port to address
+            0x11,           // 5. Startup and Completion Info (Execute immediately)
+            0x0B,           // 6. Subcommand: WriteDirectModeData (Turn Degrees)
+            ...degArray,    // 7, 8, 9, 10. The 4 bytes representing the degrees
+            speed & 0xFF,   // 11. Speed (-100 to 100, masked safely to an 8-bit integer)
+            100,            // 12. Max Power (0-100)
+            0x7F,           // 13. End State (0x7F = Brake motor when done)
+            0x00            // 14. THE MISSING BYTE: Use Profile (0x00 = No acceleration profile)
         ]);
 
         try {
