@@ -121,33 +121,51 @@ async def execute_sequence(event):
 
         try:
             if move == "forward":
+                left_task = None
                 if not left_failed:
-                    await window.legoBluetooth.runMotorForDegrees(LEFT, int(settings["forward_speed"]), DIR_CW, 864)
+                    # Fire left motor in the background (Non-blocking)
+                    left_task = asyncio.ensure_future(window.legoBluetooth.runMotorForDegrees(LEFT, int(settings["forward_speed"]), DIR_CW, 864))
+                    # 100ms delay prevents the Bluetooth radio from dropping packets
+                    await asyncio.sleep(0.1) 
+                    
                 if not right_failed:
+                    # Await right motor (Blocking)
                     await window.legoBluetooth.runMotorForDegrees(RIGHT, int(settings["forward_speed"]), DIR_CCW, 864)
+                    
+                # Ensure the left motor is also completely finished before moving to the next sequence item
+                if left_task: await left_task
 
             elif move == "back":
+                left_task = None
                 if not left_failed:
-                    await window.legoBluetooth.runMotorForDegrees(LEFT, int(settings["backward_speed"]), DIR_CCW, 900)
+                    left_task = asyncio.ensure_future(window.legoBluetooth.runMotorForDegrees(LEFT, int(settings["backward_speed"]), DIR_CCW, 900))
+                    await asyncio.sleep(0.1)
                 if not right_failed:
                     await window.legoBluetooth.runMotorForDegrees(RIGHT, int(settings["backward_speed"]), DIR_CW, 900)
+                if left_task: await left_task
 
             elif move == "left":
                 turn_degrees = abs(int(settings["left_angle"])) * 3
                 speed = int(settings["left_speed"])
+                left_task = None
                 if not left_failed:
-                    await window.legoBluetooth.runMotorForDegrees(LEFT, speed, DIR_CW, turn_degrees)
+                    left_task = asyncio.ensure_future(window.legoBluetooth.runMotorForDegrees(LEFT, speed, DIR_CW, turn_degrees))
+                    await asyncio.sleep(0.1)
                 if not right_failed:
                     await window.legoBluetooth.runMotorForDegrees(RIGHT, speed, DIR_CW, turn_degrees)
+                if left_task: await left_task
 
             elif move == "right":
                 turn_degrees = abs(int(settings["right_angle"])) * 3
                 speed = int(settings["right_speed"])
+                left_task = None
                 if not left_failed:
-                    await window.legoBluetooth.runMotorForDegrees(LEFT, speed, DIR_CCW, turn_degrees)
+                    left_task = asyncio.ensure_future(window.legoBluetooth.runMotorForDegrees(LEFT, speed, DIR_CCW, turn_degrees))
+                    await asyncio.sleep(0.1)
                 if not right_failed:
                     await window.legoBluetooth.runMotorForDegrees(RIGHT, speed, DIR_CCW, turn_degrees)
-                    
+                if left_task: await left_task
+
         except Exception as e:
             print_term(f"Command failed or timed out: {e}", color="red")
 
