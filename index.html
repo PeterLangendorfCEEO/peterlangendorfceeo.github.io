@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inputs and Path Builder</title>
+    <link rel="stylesheet" href="https://pyscript.net/releases/2023.11.1/core.css" />
+    <script type="module" src="https://pyscript.net/releases/2023.11.1/core.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background-color: #f4f4f9; display: flex; gap: 20px; max-width: 600px; margin: auto; }
+        .panel { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); flex: 1; }
+        h3 { margin-top: 0; }
+        .btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-bottom: 10px; }
+        button { padding: 10px; cursor: pointer; border: 1px solid #ccc; border-radius: 4px; background: #eee; font-weight: bold; }
+        button:hover { background: #ddd; }
+        .btn-success { background: #4CAF50; color: white; border: none; width: 100%; margin-top: 20px; }
+        .btn-success:hover { background: #45a049; }
+        select { width: 100%; height: 150px; margin-bottom: 10px; }
+        .setting-row { display: flex; justify-content: space-between; margin-bottom: 8px; }
+        .setting-row input { width: 60px; text-align: center; }
+        #terminal { background: #1e1e1e; color: #ffffff; font-family: monospace; padding: 10px; border-radius: 4px; height: 100px; overflow-y: auto; margin-top: 20px; font-size: 12px;}
+    </style>
+</head>
+<body>
+
+    <div class="panel">
+        <h3>Add Moves:</h3>
+        <div class="btn-grid">
+            <button id="btn-forward">Forward</button>
+            <button id="btn-back">Back</button>
+            <button id="btn-left">Left</button>
+            <button id="btn-right">Right</button>
+        </div>
+        
+        <h3>Current Sequence:</h3>
+        <select id="move-listbox" size="8"></select>
+        
+        <div class="btn-grid">
+            <button id="btn-remove">Remove Last</button>
+            <button id="btn-clear">Clear All</button>
+        </div>
+    </div>
+
+    <div class="panel">
+        <h3>Robot Settings:</h3>
+        <div class="setting-row">
+            <span>Motor Color:</span>
+            <select id="motor_color">
+                <option value="magenta">Magenta</option>
+                <option value="yellow">Yellow</option>
+                <option value="blue">Blue</option>
+                <option value="green">Green</option>
+                <option value="red">Red</option>
+                <option value="cyan">Cyan</option>
+            </select>
+        </div>
+        <div class="setting-row"><span>Motor Number:</span><input type="number" id="motor_number" value="2014"></div>
+        <div class="setting-row"><span>Forward Speed:</span><input type="number" id="fwd_spd" value="100"></div>
+        <div class="setting-row"><span>Right Speed:</span><input type="number" id="rgt_spd" value="10"></div>
+        <div class="setting-row"><span>Right Angle:</span><input type="number" id="rgt_ang" value="90"></div>
+        <div class="setting-row"><span>Left Speed:</span><input type="number" id="lft_spd" value="10"></div>
+        <div class="setting-row"><span>Left Angle:</span><input type="number" id="lft_ang" value="-90"></div>
+        <div class="setting-row"><span>Backward Speed:</span><input type="number" id="bck_spd" value="100"></div>
+
+        <button id="btn-run" class="btn-success">Connect & Start Game</button>
+        
+        <div id="terminal">System Ready...<br></div>
+    </div>
+
+    <script src="bluetooth.js"></script>
+
+    <script type="py" src="app.py"></script>
+
+</body>
+</html>
