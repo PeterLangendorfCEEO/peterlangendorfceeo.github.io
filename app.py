@@ -121,43 +121,33 @@ async def execute_sequence(event):
 
         try:
             if move == "forward":
-                await asyncio.gather(
-                    asyncio.to_thread()
-                )
-                async with asyncio.TaskGroup() as tg:
-                    if not left_failed:
-                        tg.create_task(window.legoBluetooth.runMotorForDegrees(LEFT, int(settings["forward_speed"]), DIR_CW, 864))
-                    if not right_failed:
-                        tg.create_task(window.legoBluetooth.runMotorForDegrees(RIGHT, int(settings["forward_speed"]), DIR_CCW, 864))
-
+                if not left_failed:
+                    await window.legoBluetooth.runMotorForDegrees(LEFT, int(settings["forward_speed"]), DIR_CW, 864)
+                if not right_failed:
+                    await window.legoBluetooth.runMotorForDegrees(RIGHT, int(settings["forward_speed"]), DIR_CCW, 864)
 
             elif move == "back":
-                async with asyncio.TaskGroup() as tg:
-                    if not left_failed:
-                        tg.create_task(window.legoBluetooth.runMotorForDegrees(LEFT, int(settings["backward_speed"]), DIR_CCW, 900))
-                    if not right_failed:
-                        tg.create_task(window.legoBluetooth.runMotorForDegrees(RIGHT, int(settings["backward_speed"]), DIR_CW, 900))
-
+                if not left_failed:
+                    await window.legoBluetooth.runMotorForDegrees(LEFT, int(settings["backward_speed"]), DIR_CCW, 900)
+                if not right_failed:
+                    await window.legoBluetooth.runMotorForDegrees(RIGHT, int(settings["backward_speed"]), DIR_CW, 900)
 
             elif move == "left":
                 turn_degrees = abs(int(settings["left_angle"])) * 3
                 speed = int(settings["left_speed"])
-                async with asyncio.TaskGroup() as tg:
-                    if not left_failed:
-                        tg.create_task(window.legoBluetooth.runMotorForDegrees(LEFT, speed, DIR_CW, turn_degrees))
-                    if not right_failed:
-                        tg.create_task(window.legoBluetooth.runMotorForDegrees(RIGHT, speed, DIR_CW, turn_degrees))
-
+                if not left_failed:
+                    await window.legoBluetooth.runMotorForDegrees(LEFT, speed, DIR_CW, turn_degrees)
+                if not right_failed:
+                    await window.legoBluetooth.runMotorForDegrees(RIGHT, speed, DIR_CW, turn_degrees)
 
             elif move == "right":
                 turn_degrees = abs(int(settings["right_angle"])) * 3
                 speed = int(settings["right_speed"])
-                async with asyncio.TaskGroup() as tg:
-                    if not left_failed:
-                        tg.create_task(window.legoBluetooth.runMotorForDegrees(LEFT, speed, DIR_CCW, turn_degrees))
-                    if not right_failed:
-                        tg.create_task(window.legoBluetooth.runMotorForDegrees(RIGHT, speed, DIR_CCW, turn_degrees))
-
+                if not left_failed:
+                    await window.legoBluetooth.runMotorForDegrees(LEFT, speed, DIR_CCW, turn_degrees)
+                if not right_failed:
+                    await window.legoBluetooth.runMotorForDegrees(RIGHT, speed, DIR_CCW, turn_degrees)
+                    
         except Exception as e:
             print_term(f"Command failed or timed out: {e}", color="red")
 
