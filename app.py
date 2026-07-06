@@ -144,3 +144,4 @@ proxy = create_proxy(lambda e: asyncio.ensure_future(execute_sequence(e)))
 document.querySelector("#btn-run").addEventListener("click", proxy)
 
 load_state()
+document.getElementById("loading-screen").classList.add("fade-out")
