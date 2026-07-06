@@ -6,10 +6,6 @@ window.legoBluetooth = {
         try {
             console.log("Requesting Web Bluetooth Connection...");
             
-            // The 128-bit LEGO Characteristic UUID
-            const charUuid = '00001624-1212-efde-1623-785feabcd123';
-            
-            // We ask for the 16-bit alias (0xFD02) to bypass the Chrome filter bug
             this.device = await navigator.bluetooth.requestDevice({
                 acceptAllDevices: true,
                 optionalServices: ['00001623-1212-efde-1623-785feabcd123', 0xFD02] 
@@ -20,17 +16,32 @@ window.legoBluetooth = {
             // Give the hub a second to wake up
             await new Promise(resolve => setTimeout(resolve, 1000));
 
-            // Fallback routing: try the long UUID, if it fails, grab the 16-bit alias
             let service;
             try {
                 service = await server.getPrimaryService('00001623-1212-efde-1623-785feabcd123');
             } catch (e) {
+                console.log("Standard 128-bit service hidden. Falling back to 16-bit alias (0xFD02)...");
                 service = await server.getPrimaryService(0xFD02);
             }
 
-            this.characteristic = await service.getCharacteristic(charUuid);
-            console.log("Successfully bound to motor characteristic!");
-            return true;
+            console.log("Service locked in. Scanning for writable characteristics...");
+            
+            // THE FIX: Dynamically fetch ALL characteristics instead of guessing the UUID
+            const characteristics = await service.getCharacteristics();
+            
+            for (let char of characteristics) {
+                console.log(`Discovered Characteristic: ${char.uuid}`);
+                
+                // Automatically bind to the first characteristic that allows us to send commands
+                if (char.properties.write || char.properties.writeWithoutResponse) {
+                    this.characteristic = char;
+                    console.log(`SUCCESS! Bound to writable characteristic: ${char.uuid}`);
+                    return true;
+                }
+            }
+
+            console.error("Failed to find any writable characteristics.");
+            return false;
             
         } catch (error) {
             console.error("Web Bluetooth Error: ", error);
