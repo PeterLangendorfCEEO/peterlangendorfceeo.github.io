@@ -5,7 +5,6 @@ import asyncio
 import json
 
 ENGINE_FAILURE_CHANCE = 10
-
 DIR_CW = 0
 DIR_CCW = 1
 TURN_MULTIPLIER = 1.7
@@ -14,25 +13,27 @@ is_connected = False
 
 def print_term(message, color="lime"):
     terminal = document.querySelector("#terminal")
-    terminal.innerHTML += f"<span style='color:{color};'>{message}</span><br>"
-    terminal.scrollTop = terminal.scrollHeight
+    if terminal:
+        terminal.innerHTML += f"<span style='color:{color};'>{message}</span><br>"
+        terminal.scrollTop = terminal.scrollHeight
 
 def set_status(message, color="lime"):
     terminal = document.querySelector("#terminal")
-    terminal.innerHTML = f"<span style='color:{color};'>{message}</span><br>"
+    if terminal:
+        terminal.innerHTML = f"<span style='color:{color};'>{message}</span><br>"
 
 def update_status():
     listbox = document.querySelector("#move-listbox")
-    if listbox.children.length == 0:
+    if listbox and listbox.children.length == 0:
         set_status("Add a move to begin...")
     elif not is_connected:
         set_status("Connect a motor to begin...")
     else:
         set_status("Ready to execute!", color="#00ffcc")
 
-# --- UI State Management ---
 def add_move(move):
     listbox = document.querySelector("#move-listbox")
+    if not listbox: return
     item = document.createElement("div")
     item.className = "list-item"
     item.draggable = True
@@ -50,49 +51,62 @@ def remove_selected(event):
         update_status()
 
 def clear_all(event):
-    document.querySelector("#move-listbox").innerHTML = ""
+    listbox = document.querySelector("#move-listbox")
+    if listbox: listbox.innerHTML = ""
     save_state()
     update_status()
 
-document.querySelector("#btn-forward").onclick = lambda e: add_move("forward")
-document.querySelector("#btn-back").onclick = lambda e: add_move("back")
-document.querySelector("#btn-left").onclick = lambda e: add_move("left")
-document.querySelector("#btn-right").onclick = lambda e: add_move("right")
-document.querySelector("#btn-remove").onclick = remove_selected
-document.querySelector("#btn-clear").onclick = clear_all
-
 def save_state(*args):
-    settings = {
-        "forward_speed": document.querySelector("#fwd_spd").value,
-        "right_speed": document.querySelector("#rgt_spd").value,
-        "right_angle": document.querySelector("#rgt_ang").value,
-        "left_speed": document.querySelector("#lft_spd").value,
-        "left_angle": document.querySelector("#lft_ang").value,
-        "backward_speed": document.querySelector("#bck_spd").value,
-    }
-    listbox = document.querySelector("#move-listbox")
-    moves = [listbox.children.item(i).innerText.lower() for i in range(listbox.children.length)]
-    window.localStorage.setItem("cyber_settings", json.dumps(settings))
-    window.localStorage.setItem("cyber_moves", json.dumps(moves))
+    try:
+        settings = {
+            "forward_speed": document.querySelector("#fwd_spd").value,
+            "right_speed": document.querySelector("#rgt_spd").value,
+            "right_angle": document.querySelector("#rgt_ang").value,
+            "left_speed": document.querySelector("#lft_spd").value,
+            "left_angle": document.querySelector("#lft_ang").value,
+            "backward_speed": document.querySelector("#bck_spd").value,
+        }
+        listbox = document.querySelector("#move-listbox")
+        moves = [listbox.children.item(i).innerText.lower() for i in range(listbox.children.length)]
+        window.localStorage.setItem("cyber_settings", json.dumps(settings))
+        window.localStorage.setItem("cyber_moves", json.dumps(moves))
+    except Exception as e:
+        pass # Silently catch DOM errors so it doesn't crash the proxy loop
 
 def load_state():
-    saved_settings = window.localStorage.getItem("cyber_settings")
-    saved_moves = window.localStorage.getItem("cyber_moves")
-    if saved_settings:
-        settings = json.loads(saved_settings)
-        document.querySelector("#fwd_spd").value = settings.get("forward_speed", 100)
-        document.querySelector("#rgt_spd").value = settings.get("right_speed", 10)
-        document.querySelector("#rgt_ang").value = settings.get("right_angle", 90)
-        document.querySelector("#lft_spd").value = settings.get("left_speed", 10)
-        document.querySelector("#lft_ang").value = settings.get("left_angle", -90)
-        document.querySelector("#bck_spd").value = settings.get("backward_speed", 100)
-    if saved_moves:
-        moves = json.loads(saved_moves)
-        for move in moves:
-            add_move(move)
-
-proxy_drag = create_proxy(save_state)
-document.querySelector("#move-listbox").addEventListener("dragend", proxy_drag)
+    try:
+        saved_settings = window.localStorage.getItem("cyber_settings")
+        saved_moves = window.localStorage.getItem("cyber_moves")
+        
+        if saved_settings:
+            try:
+                settings = json.loads(saved_settings)
+                fwd = document.querySelector("#fwd_spd")
+                if fwd and "forward_speed" in settings: fwd.value = settings["forward_speed"]
+                rgt = document.querySelector("#rgt_spd")
+                if rgt and "right_speed" in settings: rgt.value = settings["right_speed"]
+                rgt_a = document.querySelector("#rgt_ang")
+                if rgt_a and "right_angle" in settings: rgt_a.value = settings["right_angle"]
+                lft = document.querySelector("#lft_spd")
+                if lft and "left_speed" in settings: lft.value = settings["left_speed"]
+                lft_a = document.querySelector("#lft_ang")
+                if lft_a and "left_angle" in settings: lft_a.value = settings["left_angle"]
+                bck = document.querySelector("#bck_spd")
+                if bck and "backward_speed" in settings: bck.value = settings["backward_speed"]
+            except Exception:
+                pass
+                
+        if saved_moves:
+            try:
+                moves = json.loads(saved_moves)
+                for move in moves:
+                    add_move(move)
+            except Exception:
+                pass
+    except Exception as e:
+        # If the local storage is fully corrupted, wipe it.
+        window.localStorage.removeItem("cyber_settings")
+        window.localStorage.removeItem("cyber_moves")
 
 # --- Hardware Execution ---
 async def connect_motor(event):
@@ -101,7 +115,6 @@ async def connect_motor(event):
     
     device_name = await window.legoBluetooth.connectHub()
     
-    # If connection fails or is cancelled, the button stays active
     if not device_name or device_name == False:
         print_term("Connection failed or cancelled.", color="red")
         is_connected = False
@@ -118,18 +131,17 @@ async def connect_motor(event):
     btn_connect.innerText = "CONNECTED"
     
     hw_id = document.getElementById("hardware-id")
-    hw_id.innerText = str(device_name).upper()
-    hw_id.style.color = "var(--neon-cyan)"
+    if hw_id:
+        hw_id.innerText = str(device_name).upper()
+        hw_id.style.color = "var(--neon-cyan)"
 
 async def run_sequence(event):
     if not is_connected:
         update_status()
         return
 
-    # Immediately lock down the execute button so it can only be fired once
     document.querySelector("#btn-begin").setAttribute("disabled", "true")
     
-    # Explicitly ensure the diagnostics button is locked during execution
     btn_diag = document.querySelector("#btn-diagnostics")
     if btn_diag:
         btn_diag.setAttribute("disabled", "true")
@@ -137,12 +149,17 @@ async def run_sequence(event):
     save_state()
     listbox = document.querySelector("#move-listbox")
     move_set = [listbox.children.item(i).innerText.lower() for i in range(listbox.children.length)]
-    settings = json.loads(window.localStorage.getItem("cyber_settings"))
+    
+    try:
+        settings = json.loads(window.localStorage.getItem("cyber_settings"))
+    except:
+        print_term("Critical Error: Payload memory corrupted.", color="red")
+        return
 
     print_term("Executing sequence...", color="#00ffcc")
     
-    # THE FIX: Reveal and start the Live Telemetry polling!
-    window.startTelemetry()
+    if hasattr(window, 'startTelemetry'):
+        window.startTelemetry()
     
     await asyncio.sleep(1)
 
@@ -161,22 +178,22 @@ async def run_sequence(event):
             tasks = []
             
             if move == "forward":
-                if not left_failed: tasks.append(asyncio.ensure_future(window.legoBluetooth.runMotorForDegrees(LEFT, int(settings["forward_speed"]), DIR_CW, 864, not right_failed)))
-                if not right_failed: tasks.append(asyncio.ensure_future(window.legoBluetooth.runMotorForDegrees(RIGHT, int(settings["forward_speed"]), DIR_CCW, 864, True)))
+                if not left_failed: tasks.append(asyncio.ensure_future(window.legoBluetooth.runMotorForDegrees(LEFT, int(settings.get("forward_speed", 100)), DIR_CW, 864, not right_failed)))
+                if not right_failed: tasks.append(asyncio.ensure_future(window.legoBluetooth.runMotorForDegrees(RIGHT, int(settings.get("forward_speed", 100)), DIR_CCW, 864, True)))
 
             elif move == "back":
-                if not left_failed: tasks.append(asyncio.ensure_future(window.legoBluetooth.runMotorForDegrees(LEFT, int(settings["backward_speed"]), DIR_CCW, 900, not right_failed)))
-                if not right_failed: tasks.append(asyncio.ensure_future(window.legoBluetooth.runMotorForDegrees(RIGHT, int(settings["backward_speed"]), DIR_CW, 900, True)))
+                if not left_failed: tasks.append(asyncio.ensure_future(window.legoBluetooth.runMotorForDegrees(LEFT, int(settings.get("backward_speed", 100)), DIR_CCW, 900, not right_failed)))
+                if not right_failed: tasks.append(asyncio.ensure_future(window.legoBluetooth.runMotorForDegrees(RIGHT, int(settings.get("backward_speed", 100)), DIR_CW, 900, True)))
 
             elif move == "left":
-                turn_degrees = abs(int(settings["left_angle"])) * TURN_MULTIPLIER
-                speed = int(settings["left_speed"])
+                turn_degrees = int(abs(float(settings.get("left_angle", -90))) * TURN_MULTIPLIER)
+                speed = int(settings.get("left_speed", 10))
                 if not left_failed: tasks.append(asyncio.ensure_future(window.legoBluetooth.runMotorForDegrees(LEFT, speed, DIR_CW, turn_degrees, not right_failed)))
                 if not right_failed: tasks.append(asyncio.ensure_future(window.legoBluetooth.runMotorForDegrees(RIGHT, speed, DIR_CW, turn_degrees, True)))
 
             elif move == "right":
-                turn_degrees = abs(int(settings["right_angle"])) * TURN_MULTIPLIER
-                speed = int(settings["right_speed"])
+                turn_degrees = int(abs(float(settings.get("right_angle", 90))) * TURN_MULTIPLIER)
+                speed = int(settings.get("right_speed", 10))
                 if not left_failed: tasks.append(asyncio.ensure_future(window.legoBluetooth.runMotorForDegrees(LEFT, speed, DIR_CCW, turn_degrees, not right_failed)))
                 if not right_failed: tasks.append(asyncio.ensure_future(window.legoBluetooth.runMotorForDegrees(RIGHT, speed, DIR_CCW, turn_degrees, True)))
 
@@ -190,17 +207,39 @@ async def run_sequence(event):
 
     print_term("Robot move sequence complete!")
     
-    # Unlock the Diagnostics Memory Audit button once the robot completely stops
     if btn_diag:
         btn_diag.removeAttribute("disabled")
 
-connect_proxy = create_proxy(lambda e: asyncio.ensure_future(connect_motor(e)))
-document.querySelector("#btn-connect").addEventListener("click", connect_proxy)
 
-begin_proxy = create_proxy(lambda e: asyncio.ensure_future(run_sequence(e)))
-document.querySelector("#btn-begin").addEventListener("click", begin_proxy)
+# --- Safe Boot Sequence ---
+try:
+    # 1. Bind UI buttons
+    document.querySelector("#btn-forward").onclick = lambda e: add_move("forward")
+    document.querySelector("#btn-back").onclick = lambda e: add_move("back")
+    document.querySelector("#btn-left").onclick = lambda e: add_move("left")
+    document.querySelector("#btn-right").onclick = lambda e: add_move("right")
+    document.querySelector("#btn-remove").onclick = remove_selected
+    document.querySelector("#btn-clear").onclick = clear_all
+    
+    # 2. Attach Proxies
+    proxy_drag = create_proxy(save_state)
+    document.querySelector("#move-listbox").addEventListener("dragend", proxy_drag)
 
-load_state()
-update_status()
+    connect_proxy = create_proxy(lambda e: asyncio.ensure_future(connect_motor(e)))
+    document.querySelector("#btn-connect").addEventListener("click", connect_proxy)
 
-document.getElementById("loading-screen").classList.add("fade-out")
+    begin_proxy = create_proxy(lambda e: asyncio.ensure_future(run_sequence(e)))
+    document.querySelector("#btn-begin").addEventListener("click", begin_proxy)
+
+    # 3. Initialize State
+    load_state()
+    update_status()
+
+except Exception as e:
+    print_term(f"Initialization Error: {str(e)}", color="red")
+
+finally:
+    # 4. Guarantee the loading screen is dismissed even if a setup error occurs!
+    loader = document.getElementById("loading-screen")
+    if loader:
+        loader.classList.add("fade-out")
