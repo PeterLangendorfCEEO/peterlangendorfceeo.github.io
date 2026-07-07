@@ -56,9 +56,10 @@
         #btn-remove, #btn-clear { border-color: #888; color: #888; }
         #btn-remove:hover, #btn-clear:hover { background: #888; color: #000; box-shadow: none; }
         
-        .btn-success { background: rgba(0, 240, 255, 0.1); color: var(--neon-cyan); border: 1px solid var(--neon-cyan); width: 100%; margin-top: 10px; padding: 15px; font-size: 1.1em; font-weight: bold; letter-spacing: 1px; }
-        .btn-success:hover { background: var(--neon-cyan); color: #000; box-shadow: 0 0 20px rgba(0, 240, 255, 0.6); }
-        .btn-success:disabled { background: transparent; color: #555; border-color: #555; cursor: not-allowed; opacity: 0.5; box-shadow: none; }
+        /* STANDARDIZED BUTTON STYLING */
+        .btn-success { background: rgba(0, 240, 255, 0.1); color: var(--neon-cyan); border: 1px solid var(--neon-cyan); width: 100%; margin-top: 15px; padding: 15px; font-size: 1.1em; font-weight: bold; letter-spacing: 1px; }
+        .btn-success:hover:not(:disabled) { background: var(--neon-cyan); color: #000; box-shadow: 0 0 20px rgba(0, 240, 255, 0.6); }
+        .btn-success:disabled { background: transparent; color: #555 !important; border-color: #555 !important; cursor: not-allowed; opacity: 0.5; box-shadow: none; }
 
         select, input { background: #000; color: var(--text-main); border: 1px solid var(--border-color); font-family: inherit; padding: 8px; border-radius: 3px; }
         select:focus, input:focus { outline: none; border-color: var(--neon-cyan); }
@@ -201,9 +202,9 @@
             <div class="panel panel-fit">
                 <h3>[ Phase 3: Hardware_Link ]</h3>
                 <button id="btn-connect" class="btn-success" style="margin-top: 0;">Connect Motor via Bluetooth</button>
-                <button id="btn-begin" class="btn-success" disabled>Execute Payload</button>
                 
-                <button id="btn-diagnostics" onclick="openChecksum()" class="btn-success" style="margin-top: 25px; border-color: var(--neon-cyan); color: var(--neon-cyan); background: rgba(0, 240, 255, 0.05);" disabled>Run Diagnostics (Memory Audit)</button>
+                <button id="btn-begin" class="btn-success" disabled>Execute Payload</button>
+                <button id="btn-diagnostics" onclick="openChecksum()" class="btn-success" disabled>Run Diagnostics (Memory Audit)</button>
             </div>
         </div>
 
@@ -312,7 +313,6 @@
                 let hash = pseudoHash(item.id, item.value);
                 let div = document.createElement('div');
                 div.className = 'mem-block';
-                // Completely mask the live robot memory. Never show the label or value.
                 div.innerHTML = `<span>Encrypted Memory Block [${index}]</span><span class="hash-text">[ SELECT ]</span>`;
                 div.onclick = () => selectBlock('right', index, hash, div);
                 rightCol.appendChild(div);
