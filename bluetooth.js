@@ -38,9 +38,9 @@ window.legoBluetooth = {
         try {
             console.log("Requesting Web Bluetooth Connection...");
 
+            // THE FIX: Removed 'acceptAllDevices: true' and explicitly filtered the ping
             this.device = await navigator.bluetooth.requestDevice({
-                acceptAllDevices: true,
-                optionalServices: [this.SERVICE_UUID]
+                filters: [{ services: [this.SERVICE_UUID] }]
             });
 
             this.client = await this.device.gatt.connect();
@@ -55,8 +55,6 @@ window.legoBluetooth = {
                 this._handleNotification(new Uint8Array(event.target.value.buffer));
             });
 
-            // Mandatory handshake -- the device won't reliably act on motor
-            // commands until this InfoRequest/InfoResponse exchange happens.
             console.log("Sending InfoRequest handshake...");
             const infoResponse = await this._sendAndWait(
                 new Uint8Array([this.INFO_REQUEST]), this.INFO_RESPONSE

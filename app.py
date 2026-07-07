@@ -17,12 +17,10 @@ def print_term(message, color="lime"):
     terminal.scrollTop = terminal.scrollHeight
 
 def set_status(message, color="lime"):
-    # Replaces the terminal contents (rather than appending) for idle status prompts
     terminal = document.querySelector("#terminal")
     terminal.innerHTML = f"<span style='color:{color};'>{message}</span><br>"
 
 def update_status():
-    # Shows the correct idle prompt based on move list / connection state
     listbox = document.querySelector("#move-listbox")
     if listbox.children.length == 0:
         set_status("Add a move to begin...")
@@ -34,19 +32,15 @@ def update_status():
 # --- UI State Management ---
 def add_move(move):
     listbox = document.querySelector("#move-listbox")
-    
-    # Create the new custom list element
     item = document.createElement("div")
     item.className = "list-item"
     item.draggable = True
     item.innerText = move.lower()
-    
     listbox.appendChild(item)
     save_state()
     update_status()
 
 def remove_selected(event):
-    # Now targets the highlighted element instead of just the last one in the list
     selected_items = document.querySelectorAll(".list-item.selected")
     if selected_items.length > 0:
         for i in range(selected_items.length):
@@ -76,10 +70,7 @@ def save_state(*args):
         "backward_speed": document.querySelector("#bck_spd").value,
     }
     listbox = document.querySelector("#move-listbox")
-    
-    # Read the custom div's innerText
     moves = [listbox.children.item(i).innerText.lower() for i in range(listbox.children.length)]
-    
     window.localStorage.setItem("cyber_settings", json.dumps(settings))
     window.localStorage.setItem("cyber_moves", json.dumps(moves))
 
@@ -99,16 +90,13 @@ def load_state():
         for move in moves:
             add_move(move)
 
-# Force Python to re-save the move sequence whenever a drag-and-drop ends
 proxy_drag = create_proxy(save_state)
 document.querySelector("#move-listbox").addEventListener("dragend", proxy_drag)
 
 # --- Hardware Execution ---
 async def connect_motor(event):
     global is_connected
-
     print_term("Triggering Web Bluetooth Pairing Menu...", color="yellow")
-
     connected = await window.legoBluetooth.connectHub()
     if not connected:
         print_term("Connection failed or cancelled.", color="red")
@@ -122,14 +110,11 @@ async def connect_motor(event):
 
 async def run_sequence(event):
     if not is_connected:
-        # Safety net -- the button should already be disabled in this case
         update_status()
         return
 
     save_state()
     listbox = document.querySelector("#move-listbox")
-    
-    # Read the text directly out of the reordered list
     move_set = [listbox.children.item(i).innerText.lower() for i in range(listbox.children.length)]
     settings = json.loads(window.localStorage.getItem("cyber_settings"))
 
@@ -143,62 +128,42 @@ async def run_sequence(event):
         left_failed = False
         right_failed = False
 
+        # --- THE SILENT BREACH --- 
+        # The failure math runs, but the terminal output warnings have been deleted.
         if random.randint(1, 100) <= ENGINE_FAILURE_CHANCE:
-            if random.randint(1, 2) == 1:
-                left_failed = True
-                print_term("! SYSTEM ALERT: Left Motor Breach !", color="red")
-            else:
-                right_failed = True
-                print_term("! SYSTEM ALERT: Right Motor Breach !", color="red")
+            if random.randint(1, 2) == 1: left_failed = True
+            else: right_failed = True
 
         print_term(f"Executing: {move.upper()}")
 
         try:
+            tasks = []
+            
+            # --- DRIFT FIX ---
+            # Commands are bundled into a local array immediately, avoiding any physical delay
             if move == "forward":
-                left_task = None
-                if not left_failed:
-                    # Fire left motor in the background (Non-blocking)
-                    left_task = asyncio.ensure_future(window.legoBluetooth.runMotorForDegrees(LEFT, int(settings["forward_speed"]), DIR_CW, 864))
-                    # 100ms delay prevents the Bluetooth radio from dropping packets
-                    await asyncio.sleep(0.1) 
-                    
-                if not right_failed:
-                    # Await right motor (Blocking)
-                    await window.legoBluetooth.runMotorForDegrees(RIGHT, int(settings["forward_speed"]), DIR_CCW, 864)
-                    
-                # Ensure the left motor is also completely finished before moving to the next sequence item
-                if left_task: await left_task
+                if not left_failed: tasks.append(asyncio.ensure_future(window.legoBluetooth.runMotorForDegrees(LEFT, int(settings["forward_speed"]), DIR_CW, 864)))
+                if not right_failed: tasks.append(asyncio.ensure_future(window.legoBluetooth.runMotorForDegrees(RIGHT, int(settings["forward_speed"]), DIR_CCW, 864)))
 
             elif move == "back":
-                left_task = None
-                if not left_failed:
-                    left_task = asyncio.ensure_future(window.legoBluetooth.runMotorForDegrees(LEFT, int(settings["backward_speed"]), DIR_CCW, 900))
-                    await asyncio.sleep(0.1)
-                if not right_failed:
-                    await window.legoBluetooth.runMotorForDegrees(RIGHT, int(settings["backward_speed"]), DIR_CW, 900)
-                if left_task: await left_task
+                if not left_failed: tasks.append(asyncio.ensure_future(window.legoBluetooth.runMotorForDegrees(LEFT, int(settings["backward_speed"]), DIR_CCW, 900)))
+                if not right_failed: tasks.append(asyncio.ensure_future(window.legoBluetooth.runMotorForDegrees(RIGHT, int(settings["backward_speed"]), DIR_CW, 900)))
 
             elif move == "left":
                 turn_degrees = abs(int(settings["left_angle"])) * 3
                 speed = int(settings["left_speed"])
-                left_task = None
-                if not left_failed:
-                    left_task = asyncio.ensure_future(window.legoBluetooth.runMotorForDegrees(LEFT, speed, DIR_CW, turn_degrees))
-                    await asyncio.sleep(0.1)
-                if not right_failed:
-                    await window.legoBluetooth.runMotorForDegrees(RIGHT, speed, DIR_CW, turn_degrees)
-                if left_task: await left_task
+                if not left_failed: tasks.append(asyncio.ensure_future(window.legoBluetooth.runMotorForDegrees(LEFT, speed, DIR_CW, turn_degrees)))
+                if not right_failed: tasks.append(asyncio.ensure_future(window.legoBluetooth.runMotorForDegrees(RIGHT, speed, DIR_CW, turn_degrees)))
 
             elif move == "right":
                 turn_degrees = abs(int(settings["right_angle"])) * 3
                 speed = int(settings["right_speed"])
-                left_task = None
-                if not left_failed:
-                    left_task = asyncio.ensure_future(window.legoBluetooth.runMotorForDegrees(LEFT, speed, DIR_CCW, turn_degrees))
-                    await asyncio.sleep(0.1)
-                if not right_failed:
-                    await window.legoBluetooth.runMotorForDegrees(RIGHT, speed, DIR_CCW, turn_degrees)
-                if left_task: await left_task
+                if not left_failed: tasks.append(asyncio.ensure_future(window.legoBluetooth.runMotorForDegrees(LEFT, speed, DIR_CCW, turn_degrees)))
+                if not right_failed: tasks.append(asyncio.ensure_future(window.legoBluetooth.runMotorForDegrees(RIGHT, speed, DIR_CCW, turn_degrees)))
+
+            # Await all dispatched motor tasks simultaneously
+            for t in tasks:
+                await t
 
         except Exception as e:
             print_term(f"Command failed or timed out: {e}", color="red")
