@@ -97,16 +97,23 @@ document.querySelector("#move-listbox").addEventListener("dragend", proxy_drag)
 async def connect_motor(event):
     global is_connected
     print_term("Triggering Web Bluetooth Pairing Menu...", color="yellow")
-    connected = await window.legoBluetooth.connectHub()
-    if not connected:
+    
+    device_name = await window.legoBluetooth.connectHub()
+    
+    if not device_name:
         print_term("Connection failed or cancelled.", color="red")
         is_connected = False
         document.querySelector("#btn-begin").disabled = True
         return
 
     is_connected = True
-    print_term("Motors connected and handshake complete! Ready to execute.", color="#00ffcc")
+    print_term(f"Handshake complete! Bound to {device_name}.", color="#00ffcc")
     document.querySelector("#btn-begin").disabled = False
+    
+    # Update the global footer with the specific motor name
+    hw_id = document.querySelector("#hardware-id")
+    hw_id.innerText = str(device_name).upper()
+    hw_id.style.color = "var(--neon-cyan)"
 
 async def run_sequence(event):
     if not is_connected:
@@ -129,7 +136,7 @@ async def run_sequence(event):
         right_failed = False
 
         # --- THE SILENT BREACH --- 
-        # The failure math runs, but the terminal output warnings have been deleted.
+        # Math calculates the failure, but the terminal logs have been deleted.
         if random.randint(1, 100) <= ENGINE_FAILURE_CHANCE:
             if random.randint(1, 2) == 1: left_failed = True
             else: right_failed = True
@@ -140,7 +147,7 @@ async def run_sequence(event):
             tasks = []
             
             # --- DRIFT FIX ---
-            # Commands are bundled into a local array immediately, avoiding any physical delay
+            # Commands are injected into a single array before executing, forcing them to run simultaneously
             if move == "forward":
                 if not left_failed: tasks.append(asyncio.ensure_future(window.legoBluetooth.runMotorForDegrees(LEFT, int(settings["forward_speed"]), DIR_CW, 864)))
                 if not right_failed: tasks.append(asyncio.ensure_future(window.legoBluetooth.runMotorForDegrees(RIGHT, int(settings["forward_speed"]), DIR_CCW, 864)))

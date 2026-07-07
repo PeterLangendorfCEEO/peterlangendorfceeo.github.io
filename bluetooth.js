@@ -38,7 +38,7 @@ window.legoBluetooth = {
         try {
             console.log("Requesting Web Bluetooth Connection...");
 
-            // THE FIX: Removed 'acceptAllDevices: true' and explicitly filtered the ping
+            // THE FIX: Enforces a strict filter for the LEGO Double Motor
             this.device = await navigator.bluetooth.requestDevice({
                 filters: [{ services: [this.SERVICE_UUID] }]
             });
@@ -63,7 +63,8 @@ window.legoBluetooth = {
             const rpcBuild = infoResponse[2] | (infoResponse[3] << 8);
             console.log(`Handshake complete. Device RPC version: ${rpcMajor}.${rpcMinor}.${rpcBuild}`);
 
-            return true;
+            // Returns the physical device name (e.g. "LEGO Hub") to Python
+            return this.device.name || "Double Motor";
 
         } catch (error) {
             console.error("Web Bluetooth Error: ", error);
