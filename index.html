@@ -87,6 +87,7 @@
 
         #footer-status { position: fixed; bottom: 0; left: 0; width: 100%; background: #08080c; border-top: 1px solid var(--border-color); padding: 12px; text-align: center; color: #888; z-index: 100; box-shadow: 0 -5px 15px rgba(0,0,0,0.5); }
 
+        /* --- MODAL ENGINE --- */
         .modal-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.9); backdrop-filter: blur(8px); z-index: 200; display: flex; justify-content: center; align-items: center; }
         .modal-content { background: var(--panel-bg); border: 2px solid var(--neon-cyan); padding: 30px; border-radius: 8px; width: 95%; max-width: 1000px; box-shadow: 0 0 40px rgba(0, 240, 255, 0.15); display: flex; flex-direction: column; max-height: 90vh; }
         
@@ -107,7 +108,6 @@
         .match-success .hash-text { color: var(--neon-green); font-weight: bold; }
         .match-fail .hash-text { color: var(--neon-red); font-weight: bold; }
 
-        /* --- UPDATED CANVAS CONTAINER --- */
         .canvas-container { width: 100%; overflow-x: auto; overflow-y: hidden; background: #000; border: 1px solid var(--border-color); border-radius: 4px; box-shadow: inset 0 0 15px rgba(0,0,0,0.8); margin-top: 15px; }
         .canvas-container::-webkit-scrollbar { height: 8px; }
         .canvas-container::-webkit-scrollbar-track { background: #000; }
@@ -119,6 +119,9 @@
         .legend { display: flex; justify-content: center; gap: 20px; margin-top: 10px; font-size: 0.9em; }
         .legend-item { display: flex; align-items: center; gap: 8px; }
         .color-box { width: 12px; height: 12px; border-radius: 2px; }
+
+        .analysis-guide { background: rgba(0, 240, 255, 0.05); border-left: 3px solid var(--neon-cyan); padding: 12px 15px; margin-top: 10px; color: #aaa; font-size: 0.9em; line-height: 1.4; }
+        .analysis-guide strong { color: var(--neon-cyan); }
     </style>
 </head>
 <body>
@@ -147,8 +150,14 @@
 
     <div id="sensor-overlay" class="modal-overlay" style="display: none;">
         <div class="modal-content">
-            <h2 style="text-align: center; color: var(--neon-cyan); margin-top: 0; text-shadow: 0 0 10px rgba(0,240,255,0.4);">[ SENSOR TELEMETRY LOG ]</h2>
-            <p style="text-align: center; color: #888; margin-top: -10px;">Hardware RPM filtered and plotted against Programmer instructions.</p>
+            <h2 style="text-align: center; color: var(--neon-cyan); margin-top: 0; margin-bottom: 5px; text-shadow: 0 0 10px rgba(0,240,255,0.4);">[ SENSOR TELEMETRY LOG ]</h2>
+            
+            <div style="display: flex; gap: 20px; align-items: stretch; margin-bottom: 5px;">
+                <div class="analysis-guide" style="flex: 1;">
+                    <strong>ANALYSIS GUIDE:</strong> Look for periods where a motor's output drops to zero unexpectedly. In a healthy system moving straight, both motors should perfectly reflect each other. If one goes dead, the engine has been breached!
+                </div>
+                <button id="btn-toggle-graph" onclick="toggleGraphMode()" class="btn-success" style="width: auto; margin-top: 10px; padding: 10px 20px; border-color: var(--neon-green); color: var(--neon-green);">Mode:<br>Normal (Simplified)</button>
+            </div>
             
             <div class="canvas-container">
                 <canvas id="sensor-canvas" width="900" height="400"></canvas>
@@ -379,14 +388,30 @@
             }
         }
 
-        // --- FILTERED CANVAS ENGINE ---
+        // --- ENHANCED CANVAS ENGINE ---
         let telemetryTimer = null;
         let telemetryHistory = [];
         let isRecording = false;
         let recordStartMs = 0;
+        let graphMode = 'normal'; // Toggle state
         
         window.currentMoveLabel = "IDLE"; 
         
+        function toggleGraphMode() {
+            graphMode = graphMode === 'normal' ? 'advanced' : 'normal';
+            const btn = document.getElementById('btn-toggle-graph');
+            if (graphMode === 'normal') {
+                btn.innerHTML = "Mode:<br>Normal (Simplified)";
+                btn.style.borderColor = "var(--neon-green)";
+                btn.style.color = "var(--neon-green)";
+            } else {
+                btn.innerHTML = "Mode:<br>Advanced (Raw Data)";
+                btn.style.borderColor = "var(--neon-red)";
+                btn.style.color = "var(--neon-red)";
+            }
+            drawSensorGraph(); 
+        }
+
         window.startRecording = function() {
             telemetryHistory = [];
             isRecording = true;
@@ -427,9 +452,9 @@
         function drawSensorGraph() {
             const canvas = document.getElementById('sensor-canvas');
             const ctx = canvas.getContext('2d');
-            const h = 400; // Fixed canvas height
+            const h = 400; 
             const pad = 40;
-            const leftPad = 60; // Extra padding for Y-Axis labels
+            const leftPad = 60; 
             
             let regions = [];
             let currentRegion = null;
@@ -465,7 +490,7 @@
             
             const maxT = Math.max(1, telemetryHistory[telemetryHistory.length - 1].t);
             
-            // --- DRAW Y-AXIS GRID LINES (-100 to 100) ---
+            // --- Y-AXIS GRID LINES ---
             ctx.font = '12px Share Tech Mono';
             ctx.textBaseline = 'middle';
             ctx.textAlign = 'right';
@@ -484,7 +509,7 @@
                 ctx.fillText(speed, leftPad - 10, y);
             }
 
-            // --- DRAW REGION DASHED BORDERS & ARROWS ---
+            // --- REGION BORDERS & ARROWS ---
             ctx.font = '14px Share Tech Mono';
             ctx.textBaseline = 'bottom';
             ctx.textAlign = 'center';
@@ -517,67 +542,87 @@
                 ctx.fillText(reg.move, (startX + endX) / 2, arrowY - 5);
             }
 
-            // --- DRAW FILTERED TRAPEZOIDS ---
-            function getSimplifiedPoints(key) {
-                let simplified = [];
-                for (let reg of regions) {
-                    let pts = telemetryHistory.filter(p => p.t >= reg.start && p.t <= reg.end);
-                    if (pts.length === 0) continue;
+            // --- PLOTTING LOGIC ---
+            if (graphMode === 'normal') {
+                // NORMAL MODE: Filtered Trapezoids
+                function getSimplifiedPoints(key) {
+                    let simplified = [];
+                    for (let reg of regions) {
+                        let pts = telemetryHistory.filter(p => p.t >= reg.start && p.t <= reg.end);
+                        if (pts.length === 0) continue;
 
-                    if (reg.move === 'IDLE' || reg.move === 'END') {
-                        simplified.push({ t: reg.start, val: 0 });
-                        simplified.push({ t: reg.end, val: 0 });
-                        continue;
-                    }
-
-                    // Scan raw data to see if the motor was actually moving
-                    let maxAbs = 0;
-                    let maxVal = 0;
-                    for (let p of pts) {
-                        if (Math.abs(p[key]) > maxAbs) {
-                            maxAbs = Math.abs(p[key]);
-                            maxVal = p[key];
+                        if (reg.move === 'IDLE' || reg.move === 'END') {
+                            simplified.push({ t: reg.start, val: 0 });
+                            simplified.push({ t: reg.end, val: 0 });
+                            continue;
                         }
+
+                        let maxAbs = 0;
+                        let maxVal = 0;
+                        for (let p of pts) {
+                            if (Math.abs(p[key]) > maxAbs) {
+                                maxAbs = Math.abs(p[key]);
+                                maxVal = p[key];
+                            }
+                        }
+
+                        let amp = 0;
+                        if (maxAbs > 5) {
+                            amp = Math.sign(maxVal) * 100;
+                        }
+
+                        let activeEnd = Math.max(reg.start + 100, reg.end - 500);
+                        let activeDuration = activeEnd - reg.start;
+                        let ramp = Math.min(200, activeDuration * 0.2);
+
+                        simplified.push({ t: reg.start, val: 0 });
+                        simplified.push({ t: reg.start + ramp, val: amp });
+                        simplified.push({ t: activeEnd - ramp, val: amp });
+                        simplified.push({ t: activeEnd, val: 0 });
+                        simplified.push({ t: reg.end, val: 0 });
                     }
+                    return simplified;
+                }
 
-                    let amp = 0;
-                    // If motor is not completely dead, force amplitude to full 100 for easy visual reading
-                    if (maxAbs > 5) {
-                        amp = Math.sign(maxVal) * 100;
+                function drawSimplifiedLine(key, color) {
+                    const pts = getSimplifiedPoints(key);
+                    ctx.strokeStyle = color;
+                    ctx.lineWidth = 3;
+                    ctx.lineJoin = 'round';
+                    ctx.beginPath();
+                    for (let i = 0; i < pts.length; i++) {
+                        const pt = pts[i];
+                        const x = leftPad + (pt.t / maxT) * (w - leftPad - pad);
+                        const y = h/2 - (pt.val / 100) * (h/2 - pad);
+                        if (i === 0) ctx.moveTo(x, y);
+                        else ctx.lineTo(x, y);
                     }
-
-                    // Pull back the trapezoid end to account for app.py's 0.5s sleep delay between instructions
-                    let activeEnd = Math.max(reg.start + 100, reg.end - 500);
-                    let activeDuration = activeEnd - reg.start;
-                    let ramp = Math.min(200, activeDuration * 0.2); // Ramp up over 200ms
-
-                    simplified.push({ t: reg.start, val: 0 });
-                    simplified.push({ t: reg.start + ramp, val: amp });
-                    simplified.push({ t: activeEnd - ramp, val: amp });
-                    simplified.push({ t: activeEnd, val: 0 });
-                    simplified.push({ t: reg.end, val: 0 });
+                    ctx.stroke();
                 }
-                return simplified;
-            }
-
-            function drawSimplifiedLine(key, color) {
-                const pts = getSimplifiedPoints(key);
-                ctx.strokeStyle = color;
-                ctx.lineWidth = 3;
-                ctx.lineJoin = 'round';
-                ctx.beginPath();
-                for (let i = 0; i < pts.length; i++) {
-                    const pt = pts[i];
-                    const x = leftPad + (pt.t / maxT) * (w - leftPad - pad);
-                    const y = h/2 - (pt.val / 100) * (h/2 - pad);
-                    if (i === 0) ctx.moveTo(x, y);
-                    else ctx.lineTo(x, y);
+                
+                drawSimplifiedLine('left', '#00ff41');
+                drawSimplifiedLine('right', '#00f0ff');
+                
+            } else {
+                // ADVANCED MODE: Raw Hardware Polling Data
+                function drawRawLine(key, color) {
+                    ctx.strokeStyle = color;
+                    ctx.lineWidth = 2;
+                    ctx.lineJoin = 'round';
+                    ctx.beginPath();
+                    for (let i = 0; i < telemetryHistory.length; i++) {
+                        const pt = telemetryHistory[i];
+                        const x = leftPad + (pt.t / maxT) * (w - leftPad - pad);
+                        const y = h/2 - (pt[key] / 100) * (h/2 - pad);
+                        if (i === 0) ctx.moveTo(x, y);
+                        else ctx.lineTo(x, y);
+                    }
+                    ctx.stroke();
                 }
-                ctx.stroke();
+                
+                drawRawLine('left', '#00ff41');
+                drawRawLine('right', '#00f0ff');
             }
-            
-            drawSimplifiedLine('left', '#00ff41');
-            drawSimplifiedLine('right', '#00f0ff');
         }
 
         const listbox = document.getElementById('move-listbox');
@@ -600,8 +645,8 @@
         }
     </script>
 
-    <script src="bluetooth.js?v=12.0"></script>
-    <script type="py" src="app.py?v=12.0"></script>
+    <script src="bluetooth.js?v=13.0"></script>
+    <script type="py" src="app.py?v=13.0"></script>
 
 </body>
 </html>
