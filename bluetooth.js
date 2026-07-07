@@ -26,8 +26,6 @@ window.legoBluetooth = {
     MOTOR_BITS_LEFT: 1, MOTOR_BITS_RIGHT: 2, MOTOR_BITS_BOTH: 3,
     DIRECTION_CLOCKWISE: 0, DIRECTION_COUNTERCLOCKWISE: 1,
 
-    STATUS_LABEL: {0: "COMPLETED", 1: "INTERRUPTED", 2: "NACK"},
-
     _rawYawTenthDeg: null,
     zeroAngle: null,
     imu: {},
@@ -37,7 +35,7 @@ window.legoBluetooth = {
         try {
             console.log("Requesting Web Bluetooth Connection...");
 
-            // THE FIX: Strict filter re-enabled
+            // THE FIX: Strict Double Motor Filter Restored
             this.device = await navigator.bluetooth.requestDevice({
                 filters: [{ services: [this.SERVICE_UUID] }]
             });
@@ -58,6 +56,7 @@ window.legoBluetooth = {
             await this._sendAndWait(new Uint8Array([this.INFO_REQUEST]), this.INFO_RESPONSE);
             
             await this.enableTelemetry(50);
+
             return this.device.name || "DOUBLE MOTOR";
 
         } catch (error) {
@@ -133,15 +132,13 @@ window.legoBluetooth = {
             } else if (subType === 10 /* MOTOR_NOTIFICATION */) {
                 const view = new DataView(data.buffer, data.byteOffset + 1, size);
                 const bitMask = view.getUint8(0);
-                this.motorTelemetry[bitMask] = {
-                    speed: view.getInt8(6),
-                };
+                this.motorTelemetry[bitMask] = { speed: view.getInt8(6) };
             }
             data = data.slice(1 + size);
         }
     },
 
-    // THE FIX: Restored the Mutex to stop the GATT crash
+    // THE FIX: The Transmission Mutex. Prevents Python commands from crashing the radio.
     _processWriteQueue: async function() {
         if (this._isWriting || this._writeQueue.length === 0) return;
         this._isWriting = true;
@@ -166,17 +163,14 @@ window.legoBluetooth = {
         });
     },
 
-    // THE FIX: Added 'blocking' flag back to prevent Timeout 123
+    // THE FIX: Safe timeout handling (resolves to null instead of violently rejecting promises)
     _sendAndWait: function(bytes, expectedResultType, timeoutMs = 4000, blocking = true) {
         return new Promise(async (resolve, reject) => {
             if (!this._pending[expectedResultType]) this._pending[expectedResultType] = [];
             
             let timer;
             if (blocking) {
-                timer = setTimeout(() => {
-                    // Graceful timeout instead of crashing
-                    resolve(null);
-                }, timeoutMs);
+                timer = setTimeout(() => resolve(null), timeoutMs);
                 this._pending[expectedResultType].push((payload) => {
                     clearTimeout(timer);
                     resolve(payload);
@@ -227,7 +221,7 @@ window.legoBluetooth = {
         return Promise.all(waiters);
     },
 
-    // THE FIX: Uses blocking=false so the radio doesn't stall waiting for an ack it already missed
+    // THE FIX: Uses blocking=false so Python can safely control the while-loop
     runMotorContinuous: async function(bitMask, speedPercent, direction) {
         const combined = this._concat(this._buildSetSpeed(bitMask, speedPercent), this._buildRun(bitMask, direction));
         return this._sendAndWait(combined, this.MOTOR_RUN_RESULT, 4000, false);
@@ -235,22 +229,5 @@ window.legoBluetooth = {
 
     stopMotor: async function(bitMask) {
         return this._sendAndWait(this._buildStop(bitMask), this.MOTOR_STOP_RESULT, 4000, false);
-    },
-
-    turnUntilAngle: async function(bitMask, speedPercent, direction, targetAngle, toleranceDeg = 7.5, maxMs = 15000) {
-        if (this.getAngle() === null) return false;
-        
-        await this.runMotorContinuous(bitMask, speedPercent, direction);
-
-        const start = Date.now();
-        while (Date.now() - start < maxMs) {
-            const current = this.getAngle();
-            const error = Math.abs(this.normalizeAngle(current - targetAngle));
-            if (error < toleranceDeg) break;
-            await new Promise(r => setTimeout(r, 20));
-        }
-        
-        await this.stopMotor(bitMask);
-        return true;
     }
 };
