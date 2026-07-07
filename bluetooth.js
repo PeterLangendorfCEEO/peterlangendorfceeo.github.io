@@ -98,7 +98,8 @@ window.legoBluetooth = {
             // Turn on periodic telemetry (IMU yaw, etc.) so angle-feedback turning works.
             await this.enableTelemetry(50);
 
-            return true;
+            // THE FIX: Returns the hardware name to Python so the footer updates!
+            return this.device.name || "DOUBLE MOTOR";
 
         } catch (error) {
             console.error("Web Bluetooth Error: ", error);
