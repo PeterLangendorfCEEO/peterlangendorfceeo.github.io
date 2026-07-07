@@ -105,16 +105,16 @@ async def connect_motor(event):
     if not device_name or device_name == False:
         print_term("Connection failed or cancelled.", color="red")
         is_connected = False
-        document.querySelector("#btn-begin").disabled = True
+        document.querySelector("#btn-begin").setAttribute("disabled", "true")
         return
 
     is_connected = True
     print_term(f"Handshake complete! Bound to {device_name}.", color="#00ffcc")
     
-    # Enable the Execute button, and lock down the Connect button
-    document.querySelector("#btn-begin").disabled = False
+    document.querySelector("#btn-begin").removeAttribute("disabled")
+    
     btn_connect = document.querySelector("#btn-connect")
-    btn_connect.disabled = True
+    btn_connect.setAttribute("disabled", "true")
     btn_connect.innerText = "CONNECTED"
     
     hw_id = document.getElementById("hardware-id")
@@ -126,8 +126,13 @@ async def run_sequence(event):
         update_status()
         return
 
-    # Disable the Execute button immediately so they can't double-click it
-    document.querySelector("#btn-begin").disabled = True
+    # Immediately lock down the execute button so it can only be fired once
+    document.querySelector("#btn-begin").setAttribute("disabled", "true")
+    
+    # Explicitly ensure the diagnostics button is locked during execution
+    btn_diag = document.querySelector("#btn-diagnostics")
+    if btn_diag:
+        btn_diag.setAttribute("disabled", "true")
 
     save_state()
     listbox = document.querySelector("#move-listbox")
@@ -135,6 +140,10 @@ async def run_sequence(event):
     settings = json.loads(window.localStorage.getItem("cyber_settings"))
 
     print_term("Executing sequence...", color="#00ffcc")
+    
+    # THE FIX: Reveal and start the Live Telemetry polling!
+    window.startTelemetry()
+    
     await asyncio.sleep(1)
 
     LEFT = window.legoBluetooth.MOTOR_BITS_LEFT
@@ -181,10 +190,9 @@ async def run_sequence(event):
 
     print_term("Robot move sequence complete!")
     
-    # Enable the Run Diagnostics button once the robot stops moving
-    btn_diag = document.querySelector("#btn-diagnostics")
+    # Unlock the Diagnostics Memory Audit button once the robot completely stops
     if btn_diag:
-        btn_diag.disabled = False
+        btn_diag.removeAttribute("disabled")
 
 connect_proxy = create_proxy(lambda e: asyncio.ensure_future(connect_motor(e)))
 document.querySelector("#btn-connect").addEventListener("click", connect_proxy)

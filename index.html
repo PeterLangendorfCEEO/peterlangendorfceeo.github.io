@@ -206,6 +206,12 @@
                 <button id="btn-begin" class="btn-success" disabled>Execute Payload</button>
                 <button id="btn-diagnostics" onclick="openChecksum()" class="btn-success" disabled>Run Diagnostics (Memory Audit)</button>
             </div>
+
+            <div class="panel panel-fit" id="panel-telemetry" style="display: none; border-color: var(--neon-cyan); border-top-color: var(--neon-cyan);">
+                <h3 style="color: var(--neon-cyan); border-bottom-color: var(--border-color);">[ Live_Telemetry ]</h3>
+                <div class="setting-row"><span>Left Motor [M0]:</span><span id="speed-left" style="color: var(--neon-green); font-weight: bold;">0 %</span></div>
+                <div class="setting-row" style="margin-bottom: 0;"><span>Right Motor [M1]:</span><span id="speed-right" style="color: var(--neon-green); font-weight: bold;">0 %</span></div>
+            </div>
         </div>
 
         <div class="panel">
@@ -419,10 +425,23 @@
                 }
             }, { offset: Number.NEGATIVE_INFINITY }).element;
         }
-    </script>
 
-    <script src="bluetooth.js"></script>
-    <script type="py" src="app.py"></script>
+        // --- TELEMETRY UI ENGINE ---
+        let telemetryTimer = null;
+        function startTelemetry() {
+            document.getElementById('panel-telemetry').style.display = 'flex';
+            if (!telemetryTimer) {
+                telemetryTimer = setInterval(() => {
+                    if(window.legoBluetooth) {
+                        let left = window.legoBluetooth.getMotorSpeed(1);
+                        let right = window.legoBluetooth.getMotorSpeed(2);
+                        document.getElementById('speed-left').innerText = (left !== null ? left : 0) + ' %';
+                        document.getElementById('speed-right').innerText = (right !== null ? right : 0) + ' %';
+                    }
+                }, 50); // Polling at 20Hz matches the hardware broadcast speed
+            }
+        }
+    </script>
 
 </body>
 </html>
