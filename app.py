@@ -1,10 +1,11 @@
-from pyodide.ffi import create_proxy
+from pyodide.ffi import create_proxy, to_js
 from pyscript import document, window
 import random
 import asyncio
 import json
 
 ENGINE_FAILURE_CHANCE = 10
+
 DIR_CW = 0
 DIR_CCW = 1
 TURN_MULTIPLIER = 1.7
@@ -31,6 +32,7 @@ def update_status():
     else:
         set_status("Ready to execute!", color="#00ffcc")
 
+# --- UI State Management ---
 def add_move(move):
     listbox = document.querySelector("#move-listbox")
     if not listbox: return
@@ -71,7 +73,7 @@ def save_state(*args):
         window.localStorage.setItem("cyber_settings", json.dumps(settings))
         window.localStorage.setItem("cyber_moves", json.dumps(moves))
     except Exception as e:
-        pass # Silently catch DOM errors so it doesn't crash the proxy loop
+        pass 
 
 def load_state():
     try:
@@ -104,7 +106,6 @@ def load_state():
             except Exception:
                 pass
     except Exception as e:
-        # If the local storage is fully corrupted, wipe it.
         window.localStorage.removeItem("cyber_settings")
         window.localStorage.removeItem("cyber_moves")
 
@@ -175,30 +176,35 @@ async def run_sequence(event):
             else: right_failed = True
 
         try:
-            tasks = []
+            # THE FIX: Construct the payload list in Python to send to the JS `runForDegreesSynced` function
+            commands = []
             
             if move == "forward":
-                if not left_failed: tasks.append(asyncio.ensure_future(window.legoBluetooth.runMotorForDegrees(LEFT, int(settings.get("forward_speed", 100)), DIR_CW, 864, not right_failed)))
-                if not right_failed: tasks.append(asyncio.ensure_future(window.legoBluetooth.runMotorForDegrees(RIGHT, int(settings.get("forward_speed", 100)), DIR_CCW, 864, True)))
+                speed = int(settings.get("forward_speed", 100))
+                if not left_failed: commands.append({"bitMask": LEFT, "speedPercent": speed, "direction": DIR_CW, "degrees": 864})
+                if not right_failed: commands.append({"bitMask": RIGHT, "speedPercent": speed, "direction": DIR_CCW, "degrees": 864})
 
             elif move == "back":
-                if not left_failed: tasks.append(asyncio.ensure_future(window.legoBluetooth.runMotorForDegrees(LEFT, int(settings.get("backward_speed", 100)), DIR_CCW, 900, not right_failed)))
-                if not right_failed: tasks.append(asyncio.ensure_future(window.legoBluetooth.runMotorForDegrees(RIGHT, int(settings.get("backward_speed", 100)), DIR_CW, 900, True)))
+                speed = int(settings.get("backward_speed", 100))
+                if not left_failed: commands.append({"bitMask": LEFT, "speedPercent": speed, "direction": DIR_CCW, "degrees": 900})
+                if not right_failed: commands.append({"bitMask": RIGHT, "speedPercent": speed, "direction": DIR_CW, "degrees": 900})
 
             elif move == "left":
                 turn_degrees = int(abs(float(settings.get("left_angle", -90))) * TURN_MULTIPLIER)
                 speed = int(settings.get("left_speed", 10))
-                if not left_failed: tasks.append(asyncio.ensure_future(window.legoBluetooth.runMotorForDegrees(LEFT, speed, DIR_CW, turn_degrees, not right_failed)))
-                if not right_failed: tasks.append(asyncio.ensure_future(window.legoBluetooth.runMotorForDegrees(RIGHT, speed, DIR_CW, turn_degrees, True)))
+                if not left_failed: commands.append({"bitMask": LEFT, "speedPercent": speed, "direction": DIR_CW, "degrees": turn_degrees})
+                if not right_failed: commands.append({"bitMask": RIGHT, "speedPercent": speed, "direction": DIR_CW, "degrees": turn_degrees})
 
             elif move == "right":
                 turn_degrees = int(abs(float(settings.get("right_angle", 90))) * TURN_MULTIPLIER)
                 speed = int(settings.get("right_speed", 10))
-                if not left_failed: tasks.append(asyncio.ensure_future(window.legoBluetooth.runMotorForDegrees(LEFT, speed, DIR_CCW, turn_degrees, not right_failed)))
-                if not right_failed: tasks.append(asyncio.ensure_future(window.legoBluetooth.runMotorForDegrees(RIGHT, speed, DIR_CCW, turn_degrees, True)))
+                if not left_failed: commands.append({"bitMask": LEFT, "speedPercent": speed, "direction": DIR_CCW, "degrees": turn_degrees})
+                if not right_failed: commands.append({"bitMask": RIGHT, "speedPercent": speed, "direction": DIR_CCW, "degrees": turn_degrees})
 
-            for t in tasks:
-                await t
+            if len(commands) > 0:
+                # Convert the Python dictionary list into raw JS Objects and transmit them!
+                js_commands = to_js(commands, dict_converter=window.Object.fromEntries)
+                await window.legoBluetooth.runForDegreesSynced(js_commands)
 
         except Exception as e:
             print_term(f"Command failed or timed out: {e}", color="red")
@@ -213,7 +219,6 @@ async def run_sequence(event):
 
 # --- Safe Boot Sequence ---
 try:
-    # 1. Bind UI buttons
     document.querySelector("#btn-forward").onclick = lambda e: add_move("forward")
     document.querySelector("#btn-back").onclick = lambda e: add_move("back")
     document.querySelector("#btn-left").onclick = lambda e: add_move("left")
@@ -221,7 +226,6 @@ try:
     document.querySelector("#btn-remove").onclick = remove_selected
     document.querySelector("#btn-clear").onclick = clear_all
     
-    # 2. Attach Proxies
     proxy_drag = create_proxy(save_state)
     document.querySelector("#move-listbox").addEventListener("dragend", proxy_drag)
 
@@ -231,7 +235,6 @@ try:
     begin_proxy = create_proxy(lambda e: asyncio.ensure_future(run_sequence(e)))
     document.querySelector("#btn-begin").addEventListener("click", begin_proxy)
 
-    # 3. Initialize State
     load_state()
     update_status()
 
@@ -239,7 +242,6 @@ except Exception as e:
     print_term(f"Initialization Error: {str(e)}", color="red")
 
 finally:
-    # 4. Guarantee the loading screen is dismissed even if a setup error occurs!
     loader = document.getElementById("loading-screen")
     if loader:
         loader.classList.add("fade-out")
