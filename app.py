@@ -139,8 +139,6 @@ async def run_sequence(event):
             if random.randint(1, 2) == 1: left_failed = True
             else: right_failed = True
 
-        print_term(f"Executing: {move.upper()}")
-
         try:
             tasks = []
             
