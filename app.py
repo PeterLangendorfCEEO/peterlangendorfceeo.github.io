@@ -8,6 +8,7 @@ ENGINE_FAILURE_CHANCE = 10
 
 DIR_CW = 0
 DIR_CCW = 1
+TURN_MULTIPLIER = 1.6
 
 is_connected = False
 
@@ -154,13 +155,13 @@ async def run_sequence(event):
                 if not right_failed: tasks.append(asyncio.ensure_future(window.legoBluetooth.runMotorForDegrees(RIGHT, int(settings["backward_speed"]), DIR_CW, 900, True)))
 
             elif move == "left":
-                turn_degrees = abs(int(settings["left_angle"])) * 3 # The Wheelbase multiplier
+                turn_degrees = abs(int(settings["left_angle"])) * TURN_MULTIPLIER # The Wheelbase multiplier
                 speed = int(settings["left_speed"])
                 if not left_failed: tasks.append(asyncio.ensure_future(window.legoBluetooth.runMotorForDegrees(LEFT, speed, DIR_CW, turn_degrees, not right_failed)))
                 if not right_failed: tasks.append(asyncio.ensure_future(window.legoBluetooth.runMotorForDegrees(RIGHT, speed, DIR_CW, turn_degrees, True)))
 
             elif move == "right":
-                turn_degrees = abs(int(settings["right_angle"])) * 3
+                turn_degrees = abs(int(settings["right_angle"])) * TURN_MULTIPLIER
                 speed = int(settings["right_speed"])
                 if not left_failed: tasks.append(asyncio.ensure_future(window.legoBluetooth.runMotorForDegrees(LEFT, speed, DIR_CCW, turn_degrees, not right_failed)))
                 if not right_failed: tasks.append(asyncio.ensure_future(window.legoBluetooth.runMotorForDegrees(RIGHT, speed, DIR_CCW, turn_degrees, True)))
