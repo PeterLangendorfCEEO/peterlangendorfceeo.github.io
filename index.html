@@ -60,6 +60,12 @@
         .btn-success:hover:not(:disabled) { background: var(--neon-cyan); color: #000; box-shadow: 0 0 20px rgba(0, 240, 255, 0.6); }
         .btn-success:disabled { background: transparent !important; color: #555 !important; border-color: #555 !important; cursor: not-allowed !important; opacity: 0.5; box-shadow: none; }
 
+        /* Custom Mode Toggle Button CSS */
+        .btn-toggle-normal { border-color: var(--neon-green) !important; color: var(--neon-green) !important; }
+        .btn-toggle-normal:hover:not(:disabled) { background: var(--neon-green) !important; color: #000 !important; box-shadow: 0 0 15px rgba(0, 255, 65, 0.4) !important; }
+        .btn-toggle-advanced { border-color: var(--neon-red) !important; color: var(--neon-red) !important; }
+        .btn-toggle-advanced:hover:not(:disabled) { background: var(--neon-red) !important; color: #000 !important; box-shadow: 0 0 15px rgba(255, 0, 60, 0.4) !important; }
+
         select, input { background: #000; color: var(--text-main); border: 1px solid var(--border-color); font-family: inherit; padding: 8px; border-radius: 3px; }
         select:focus, input:focus { outline: none; border-color: var(--neon-cyan); }
         input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
@@ -87,11 +93,10 @@
 
         #footer-status { position: fixed; bottom: 0; left: 0; width: 100%; background: #08080c; border-top: 1px solid var(--border-color); padding: 12px; text-align: center; color: #888; z-index: 100; box-shadow: 0 -5px 15px rgba(0,0,0,0.5); }
 
-        /* --- MODAL ENGINE --- */
         .modal-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.9); backdrop-filter: blur(8px); z-index: 200; display: flex; justify-content: center; align-items: center; }
         .modal-content { background: var(--panel-bg); border: 2px solid var(--neon-cyan); padding: 30px; border-radius: 8px; width: 95%; max-width: 1000px; box-shadow: 0 0 40px rgba(0, 240, 255, 0.15); display: flex; flex-direction: column; max-height: 90vh; }
         
-        .checksum-grid { display: grid; grid-template-columns: 1fr 40px 1fr; gap: 10px; margin-top: 15px; overflow-y: auto; padding-right: 10px; align-items: center; }
+        .checksum-grid { display: grid; grid-template-columns: 1fr 40px 1fr; gap: 10px; overflow-y: auto; padding-right: 10px; align-items: center; }
         .checksum-header-left { text-align: center; color: var(--text-main); border-bottom: 1px solid var(--border-color); padding-bottom: 10px; }
         .checksum-header-right { text-align: center; color: var(--neon-red); border-bottom: 1px solid var(--border-color); padding-bottom: 10px; }
         
@@ -120,7 +125,7 @@
         .legend-item { display: flex; align-items: center; gap: 8px; }
         .color-box { width: 12px; height: 12px; border-radius: 2px; }
 
-        .analysis-guide { background: rgba(0, 240, 255, 0.05); border-left: 3px solid var(--neon-cyan); padding: 12px 15px; margin-top: 10px; color: #aaa; font-size: 0.9em; line-height: 1.4; }
+        .analysis-guide { background: rgba(0, 240, 255, 0.05); border-left: 3px solid var(--neon-cyan); padding: 12px 15px; color: #aaa; font-size: 0.95em; line-height: 1.4; border-radius: 4px; }
         .analysis-guide strong { color: var(--neon-cyan); }
     </style>
 </head>
@@ -134,9 +139,12 @@
 
     <div id="checksum-overlay" class="modal-overlay" style="display: none;">
         <div class="modal-content">
-            <h2 style="text-align: center; color: var(--neon-cyan); margin-top: 0; text-shadow: 0 0 10px rgba(0,240,255,0.4);">[ SECURE SHA256 MEMORY AUDIT ]</h2>
-            <h3 id="checks-counter" style="text-align: center; color: var(--neon-cyan); margin-top: -5px; border: 1px solid var(--neon-cyan); padding: 5px; width: max-content; margin-left: auto; margin-right: auto;">CHECKS REMAINING: 3</h3>
-            <p style="text-align: center; color: #888; margin-top: -5px;">Select a memory block on the left and compare it to an encrypted block on the right to verify payload integrity.</p>
+            <h2 style="text-align: center; color: var(--neon-cyan); margin-top: 0; text-shadow: 0 0 10px rgba(0,240,255,0.4);">[ SECURE MEMORY AUDIT ]</h2>
+            <h3 id="checks-counter" style="text-align: center; color: var(--neon-cyan); margin-top: -5px; margin-bottom: 15px; border: 1px solid var(--neon-cyan); padding: 5px 15px; width: max-content; margin-left: auto; margin-right: auto; border-radius: 4px;">CHECKS REMAINING: 3</h3>
+            
+            <div class="analysis-guide" style="margin-top: 0; margin-bottom: 15px;">
+                <strong>HOW TO PLAY:</strong> You have 3 tries to see if the Hacker changed your code! Click a block on the left, then click the matching block on the right. If it turns <span style="color: var(--neon-green); font-weight: bold;">GREEN</span>, it is safe. If it turns <span style="color: var(--neon-red); font-weight: bold;">RED</span>, it means the Hacker changed it!
+            </div>
             
             <div class="checksum-grid">
                 <div class="checksum-header-left">Original Programmer Inputs</div>
@@ -150,13 +158,13 @@
 
     <div id="sensor-overlay" class="modal-overlay" style="display: none;">
         <div class="modal-content">
-            <h2 style="text-align: center; color: var(--neon-cyan); margin-top: 0; margin-bottom: 5px; text-shadow: 0 0 10px rgba(0,240,255,0.4);">[ SENSOR TELEMETRY LOG ]</h2>
+            <h2 style="text-align: center; color: var(--neon-cyan); margin-top: 0; margin-bottom: 15px; text-shadow: 0 0 10px rgba(0,240,255,0.4);">[ SENSOR TELEMETRY LOG ]</h2>
             
             <div style="display: flex; gap: 20px; align-items: stretch; margin-bottom: 5px;">
                 <div class="analysis-guide" style="flex: 1;">
-                    <strong>ANALYSIS GUIDE:</strong> Look for periods where a motor's output drops to zero unexpectedly. In a healthy system moving straight, both motors should perfectly reflect each other. If one goes dead, the engine has been breached!
+                    <strong>HOW TO READ THE GRAPH:</strong> Look at the lines to see how the motors moved. A flat line at 0% means the motor is stopped. If a motor's line suddenly drops to 0% when it was supposed to be moving, it means the engine broke!
                 </div>
-                <button id="btn-toggle-graph" onclick="toggleGraphMode()" class="btn-success" style="width: auto; margin-top: 10px; padding: 10px 20px; border-color: var(--neon-green); color: var(--neon-green);">Mode:<br>Normal (Simplified)</button>
+                <button id="btn-toggle-graph" onclick="toggleGraphMode()" class="btn-success btn-toggle-normal" style="width: auto; margin-top: 0; padding: 10px 20px; height: 100%;">Mode:<br>Normal (Simplified)</button>
             </div>
             
             <div class="canvas-container">
@@ -393,7 +401,7 @@
         let telemetryHistory = [];
         let isRecording = false;
         let recordStartMs = 0;
-        let graphMode = 'normal'; // Toggle state
+        let graphMode = 'normal'; 
         
         window.currentMoveLabel = "IDLE"; 
         
@@ -402,12 +410,10 @@
             const btn = document.getElementById('btn-toggle-graph');
             if (graphMode === 'normal') {
                 btn.innerHTML = "Mode:<br>Normal (Simplified)";
-                btn.style.borderColor = "var(--neon-green)";
-                btn.style.color = "var(--neon-green)";
+                btn.className = "btn-success btn-toggle-normal";
             } else {
                 btn.innerHTML = "Mode:<br>Advanced (Raw Data)";
-                btn.style.borderColor = "var(--neon-red)";
-                btn.style.color = "var(--neon-red)";
+                btn.className = "btn-success btn-toggle-advanced";
             }
             drawSensorGraph(); 
         }
@@ -468,7 +474,6 @@
             }
             if (currentRegion) regions.push(currentRegion);
 
-            // Dynamic Width for Horizontal Scrolling
             let displayRegions = regions.filter(r => r.move !== 'IDLE' && r.move !== 'END');
             let targetWidth = 900;
             if (displayRegions.length > 6) {
@@ -544,7 +549,6 @@
 
             // --- PLOTTING LOGIC ---
             if (graphMode === 'normal') {
-                // NORMAL MODE: Filtered Trapezoids
                 function getSimplifiedPoints(key) {
                     let simplified = [];
                     for (let reg of regions) {
@@ -604,7 +608,6 @@
                 drawSimplifiedLine('right', '#00f0ff');
                 
             } else {
-                // ADVANCED MODE: Raw Hardware Polling Data
                 function drawRawLine(key, color) {
                     ctx.strokeStyle = color;
                     ctx.lineWidth = 2;
@@ -645,8 +648,8 @@
         }
     </script>
 
-    <script src="bluetooth.js?v=13.0"></script>
-    <script type="py" src="app.py?v=13.0"></script>
+    <script src="bluetooth.js?v=14.0"></script>
+    <script type="py" src="app.py?v=14.0"></script>
 
 </body>
 </html>
