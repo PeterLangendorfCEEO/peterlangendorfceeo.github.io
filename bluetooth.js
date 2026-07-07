@@ -8,12 +8,12 @@ window.legoBluetooth = {
     _writeQueue: [],
     _isWriting: false,
 
-    // Confirmed via chrome://bluetooth-internals against the real hardware.
+    yaw: 0, // Exposes the gyro data to Python
+
     SERVICE_UUID: '0000fd02-0000-1000-8000-00805f9b34fb',
     WRITE_UUID:   '0000fd02-0001-1000-8000-00805f9b34fb',
     NOTIFY_UUID:  '0000fd02-0002-1000-8000-00805f9b34fb',
 
-    // Message type IDs
     INFO_REQUEST: 0,
     INFO_RESPONSE: 1,
     MOTOR_RUN_COMMAND: 122,
@@ -40,7 +40,6 @@ window.legoBluetooth = {
         try {
             console.log("Requesting Web Bluetooth Connection...");
 
-            // THE FIX: Filters the pairing menu to ONLY show LEGO Double Motors
             this.device = await navigator.bluetooth.requestDevice({
                 filters: [{ services: [this.SERVICE_UUID] }]
             });
@@ -61,11 +60,7 @@ window.legoBluetooth = {
             const infoResponse = await this._sendAndWait(
                 new Uint8Array([this.INFO_REQUEST]), this.INFO_RESPONSE
             );
-            const rpcMajor = infoResponse[0], rpcMinor = infoResponse[1];
-            const rpcBuild = infoResponse[2] | (infoResponse[3] << 8);
-            console.log(`Handshake complete. Device RPC version: ${rpcMajor}.${rpcMinor}.${rpcBuild}`);
-
-            // THE FIX: Return the actual device name to Python so the footer updates!
+            
             return this.device.name || "DOUBLE MOTOR";
 
         } catch (error) {
@@ -78,6 +73,21 @@ window.legoBluetooth = {
         const msgType = bytes[0];
         const payload = bytes.slice(1);
 
+        // --- IMU DATA SNIFFER ---
+        // Continuous sensor streams broadcast without a pending promise queue.
+        if (!this._pending[msgType] || this._pending[msgType].length === 0) {
+            
+            // TODO: Uncomment the line below. Open your F12 Console and physically twist the motor.
+            // Look for which msgType floods the console when it moves.
+            console.log(`Background Stream [Type ${msgType}]:`, payload);
+            
+            // Once you find the exact message ID (e.g., ID 100), you can parse it like this:
+            // if (msgType === 100) {
+            //     const dataView = new DataView(payload.buffer, payload.byteOffset, payload.byteLength);
+            //     this.yaw = dataView.getInt16(0, true); 
+            // }
+        }
+
         const queue = this._pending[msgType];
         if (queue && queue.length > 0) {
             const resolve = queue.shift();
@@ -85,8 +95,6 @@ window.legoBluetooth = {
         }
     },
 
-    // --- THE GATT MUTEX ---
-    // This processes Bluetooth writes one at a time, spaced 30ms apart, completely fixing the crash.
     _processWriteQueue: async function() {
         if (this._isWriting || this._writeQueue.length === 0) return;
         this._isWriting = true;
@@ -117,7 +125,6 @@ window.legoBluetooth = {
             
             let timer;
             if (blocking) {
-                // Only start the timeout timer if we actually care about waiting for the motor to finish turning
                 timer = setTimeout(() => reject(new Error(`Timed out waiting for result type ${expectedResultType}`)), timeoutMs);
                 this._pending[expectedResultType].push((payload) => {
                     clearTimeout(timer);
@@ -126,14 +133,8 @@ window.legoBluetooth = {
             }
             
             try {
-                // Send the command through the Mutex Queue
                 await this._safeWrite(bytes);
-                
-                if (!blocking) {
-                    // THE FIX: If blocking=False, resolve immediately after sending the BLE payload
-                    // so Python can instantly send the next payload to the other motor!
-                    resolve(null); 
-                }
+                if (!blocking) resolve(null); 
             } catch (error) {
                 if (timer) clearTimeout(timer);
                 reject(error);
@@ -141,7 +142,6 @@ window.legoBluetooth = {
         });
     },
 
-    // --- Message builders ---
     _buildSetSpeed: function(bitMask, speed) {
         return new Uint8Array([this.MOTOR_SET_SPEED_COMMAND, bitMask, speed & 0xFF]);
     },
@@ -171,8 +171,6 @@ window.legoBluetooth = {
         return out;
     },
 
-    // --- Public motor commands ---
-    // Added "blocking" parameter to match the original Python library behavior
     runMotorForDegrees: async function(bitMask, speedPercent, direction, degrees, blocking = true) {
         const combined = this._concat(
             this._buildSetSpeed(bitMask, speedPercent),
@@ -186,10 +184,13 @@ window.legoBluetooth = {
             this._buildSetSpeed(bitMask, speedPercent),
             this._buildRun(bitMask, direction)
         );
-        return this._sendAndWait(combined, this.MOTOR_RUN_RESULT);
+        // We use blocking=False here so it acts as a fire-and-forget command, 
+        // allowing the Python `while` loop to take over monitoring.
+        return this._sendAndWait(combined, this.MOTOR_RUN_RESULT, 4000, false);
     },
 
     stopMotor: async function(bitMask) {
-        return this._sendAndWait(this._buildStop(bitMask), this.MOTOR_STOP_RESULT);
+        // We use blocking=False here to prevent the stop command from crashing if the radio drops the ack
+        return this._sendAndWait(this._buildStop(bitMask), this.MOTOR_STOP_RESULT, 4000, false);
     }
 };

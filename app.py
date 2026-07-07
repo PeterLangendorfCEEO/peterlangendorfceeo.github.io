@@ -3,13 +3,33 @@ from pyscript import document, window
 import random
 import asyncio
 import json
+import time
 
 ENGINE_FAILURE_CHANCE = 10
+TURN_TOLERANCE = 7.5
 
 DIR_CW = 0
 DIR_CCW = 1
 
 is_connected = False
+zero_angle = 0
+
+def get_angle():
+    # Grabs the yaw live from the JavaScript bridge
+    raw_yaw = window.legoBluetooth.yaw
+    if raw_yaw is None: raw_yaw = 0
+        
+    angle = (raw_yaw / 10) - zero_angle
+    if angle > 0: angle = angle - 360
+    angle = (angle + 180) * -1
+    if angle < 0: angle = angle + 180
+    elif angle > 0: angle = angle - 180
+    return round(angle, 1)
+
+def normalize_angle(angle):
+    if angle > 180: return angle - 360
+    elif angle < -180: return angle + 360
+    else: return angle
 
 def print_term(message, color="lime"):
     terminal = document.querySelector("#terminal")
@@ -95,11 +115,11 @@ document.querySelector("#move-listbox").addEventListener("dragend", proxy_drag)
 # --- Hardware Execution ---
 async def connect_motor(event):
     global is_connected
+    global zero_angle
     print_term("Triggering Web Bluetooth Pairing Menu...", color="yellow")
     
     device_name = await window.legoBluetooth.connectHub()
     
-    # In JS, if pairing fails it returns boolean False.
     if not device_name or device_name == False:
         print_term("Connection failed or cancelled.", color="red")
         is_connected = False
@@ -110,10 +130,14 @@ async def connect_motor(event):
     print_term(f"Handshake complete! Bound to {device_name}.", color="#00ffcc")
     document.querySelector("#btn-begin").disabled = False
     
-    # Update the global footer with the specific motor name
     hw_id = document.getElementById("hardware-id")
     hw_id.innerText = str(device_name).upper()
     hw_id.style.color = "var(--neon-cyan)"
+
+    # Zero the IMU on connection
+    await asyncio.sleep(1)
+    raw_yaw = window.legoBluetooth.yaw
+    zero_angle = raw_yaw / 10 if raw_yaw else 0
 
 async def run_sequence(event):
     if not is_connected:
@@ -142,35 +166,53 @@ async def run_sequence(event):
         print_term(f"Executing: {move.upper()}")
 
         try:
-            if move == "forward":
-                if not left_failed: 
-                    # THE FIX: Left motor uses blocking=False (or True if the right motor failed)
-                    await window.legoBluetooth.runMotorForDegrees(LEFT, int(settings["forward_speed"]), DIR_CW, 864, right_failed)
-                if not right_failed: 
-                    # Right motor uses blocking=True
-                    await window.legoBluetooth.runMotorForDegrees(RIGHT, int(settings["forward_speed"]), DIR_CCW, 864, True)
+            if move in ["forward", "back"]:
+                tasks = []
+                if move == "forward":
+                    if not left_failed: tasks.append(asyncio.ensure_future(window.legoBluetooth.runMotorForDegrees(LEFT, int(settings["forward_speed"]), DIR_CW, 864)))
+                    if not right_failed: tasks.append(asyncio.ensure_future(window.legoBluetooth.runMotorForDegrees(RIGHT, int(settings["forward_speed"]), DIR_CCW, 864)))
+                elif move == "back":
+                    if not left_failed: tasks.append(asyncio.ensure_future(window.legoBluetooth.runMotorForDegrees(LEFT, int(settings["backward_speed"]), DIR_CCW, 900)))
+                    if not right_failed: tasks.append(asyncio.ensure_future(window.legoBluetooth.runMotorForDegrees(RIGHT, int(settings["backward_speed"]), DIR_CW, 900)))
+                for t in tasks: await t
 
-            elif move == "back":
-                if not left_failed: 
-                    await window.legoBluetooth.runMotorForDegrees(LEFT, int(settings["backward_speed"]), DIR_CCW, 900, right_failed)
-                if not right_failed: 
-                    await window.legoBluetooth.runMotorForDegrees(RIGHT, int(settings["backward_speed"]), DIR_CW, 900, True)
+            elif move in ["left", "right"]:
+                # --- IMU CLOSED-LOOP TURNING ---
+                turn_degrees = float(settings[f"{move}_angle"])
+                speed = int(settings[f"{move}_speed"])
+                
+                left_dir = DIR_CW if move == "left" else DIR_CCW
+                right_dir = DIR_CW if move == "left" else DIR_CCW
 
-            elif move == "left":
-                turn_degrees = abs(int(settings["left_angle"])) * 3
-                speed = int(settings["left_speed"])
-                if not left_failed: 
-                    await window.legoBluetooth.runMotorForDegrees(LEFT, speed, DIR_CW, turn_degrees, right_failed)
-                if not right_failed: 
-                    await window.legoBluetooth.runMotorForDegrees(RIGHT, speed, DIR_CW, turn_degrees, True)
+                starting_angle = get_angle()
+                target_angle = normalize_angle(starting_angle + turn_degrees)
 
-            elif move == "right":
-                turn_degrees = abs(int(settings["right_angle"])) * 3
-                speed = int(settings["right_speed"])
+                # 1. Start continuous rotation
+                tasks = []
                 if not left_failed: 
-                    await window.legoBluetooth.runMotorForDegrees(LEFT, speed, DIR_CCW, turn_degrees, right_failed)
+                    tasks.append(asyncio.ensure_future(window.legoBluetooth.runMotorContinuous(LEFT, speed, left_dir)))
                 if not right_failed: 
-                    await window.legoBluetooth.runMotorForDegrees(RIGHT, speed, DIR_CCW, turn_degrees, True)
+                    tasks.append(asyncio.ensure_future(window.legoBluetooth.runMotorContinuous(RIGHT, speed, right_dir)))
+                for t in tasks: await t
+
+                # 2. Polling loop
+                start_time = time.time()
+                while True:
+                    current_angle = get_angle()
+                    error = abs(normalize_angle(current_angle - target_angle))
+                    
+                    if error < TURN_TOLERANCE:
+                        break
+                        
+                    if time.time() - start_time > 5.0:
+                        print_term(f"Turn timed out! Target: {target_angle}, Current: {current_angle}", color="orange")
+                        break
+                        
+                    # Yield thread to allow JS to process background BLE packets
+                    await asyncio.sleep(0.02) 
+
+                # 3. Halt the motors
+                await window.legoBluetooth.stopMotor(LEFT | RIGHT)
 
         except Exception as e:
             print_term(f"Command failed or timed out: {e}", color="red")
