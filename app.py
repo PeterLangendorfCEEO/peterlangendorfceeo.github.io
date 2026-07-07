@@ -8,7 +8,7 @@ ENGINE_FAILURE_CHANCE = 10
 
 DIR_CW = 0
 DIR_CCW = 1
-TURN_MULTIPLIER = 1.6
+TURN_MULTIPLIER = 1.7
 
 is_connected = False
 
