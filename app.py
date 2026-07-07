@@ -9,10 +9,27 @@ ENGINE_FAILURE_CHANCE = 10
 DIR_CW = 0
 DIR_CCW = 1
 
+is_connected = False
+
 def print_term(message, color="lime"):
     terminal = document.querySelector("#terminal")
     terminal.innerHTML += f"<span style='color:{color};'>{message}</span><br>"
     terminal.scrollTop = terminal.scrollHeight
+
+def set_status(message, color="lime"):
+    # Replaces the terminal contents (rather than appending) for idle status prompts
+    terminal = document.querySelector("#terminal")
+    terminal.innerHTML = f"<span style='color:{color};'>{message}</span><br>"
+
+def update_status():
+    # Shows the correct idle prompt based on move list / connection state
+    listbox = document.querySelector("#move-listbox")
+    if listbox.children.length == 0:
+        set_status("Add a move to begin...")
+    elif not is_connected:
+        set_status("Connect a motor to begin...")
+    else:
+        set_status("Ready to execute!", color="#00ffcc")
 
 # --- UI State Management ---
 def add_move(move):
@@ -26,6 +43,7 @@ def add_move(move):
     
     listbox.appendChild(item)
     save_state()
+    update_status()
 
 def remove_selected(event):
     # Now targets the highlighted element instead of just the last one in the list
@@ -34,10 +52,12 @@ def remove_selected(event):
         for i in range(selected_items.length):
             selected_items.item(i).remove()
         save_state()
+        update_status()
 
 def clear_all(event):
     document.querySelector("#move-listbox").innerHTML = ""
     save_state()
+    update_status()
 
 document.querySelector("#btn-forward").onclick = lambda e: add_move("forward")
 document.querySelector("#btn-back").onclick = lambda e: add_move("back")
@@ -84,7 +104,28 @@ proxy_drag = create_proxy(save_state)
 document.querySelector("#move-listbox").addEventListener("dragend", proxy_drag)
 
 # --- Hardware Execution ---
-async def execute_sequence(event):
+async def connect_motor(event):
+    global is_connected
+
+    print_term("Triggering Web Bluetooth Pairing Menu...", color="yellow")
+
+    connected = await window.legoBluetooth.connectHub()
+    if not connected:
+        print_term("Connection failed or cancelled.", color="red")
+        is_connected = False
+        document.querySelector("#btn-begin").disabled = True
+        return
+
+    is_connected = True
+    print_term("Motors connected and handshake complete! Ready to execute.", color="#00ffcc")
+    document.querySelector("#btn-begin").disabled = False
+
+async def run_sequence(event):
+    if not is_connected:
+        # Safety net -- the button should already be disabled in this case
+        update_status()
+        return
+
     save_state()
     listbox = document.querySelector("#move-listbox")
     
@@ -92,14 +133,7 @@ async def execute_sequence(event):
     move_set = [listbox.children.item(i).innerText.lower() for i in range(listbox.children.length)]
     settings = json.loads(window.localStorage.getItem("cyber_settings"))
 
-    print_term("Triggering Web Bluetooth Pairing Menu...", color="yellow")
-
-    connected = await window.legoBluetooth.connectHub()
-    if not connected:
-        print_term("Connection failed or cancelled.", color="red")
-        return
-
-    print_term("Motors connected and handshake complete! Executing sequence...", color="#00ffcc")
+    print_term("Executing sequence...", color="#00ffcc")
     await asyncio.sleep(1)
 
     LEFT = window.legoBluetooth.MOTOR_BITS_LEFT
@@ -173,10 +207,14 @@ async def execute_sequence(event):
 
     print_term("Robot move sequence complete!")
 
-proxy = create_proxy(lambda e: asyncio.ensure_future(execute_sequence(e)))
-document.querySelector("#btn-run").addEventListener("click", proxy)
+connect_proxy = create_proxy(lambda e: asyncio.ensure_future(connect_motor(e)))
+document.querySelector("#btn-connect").addEventListener("click", connect_proxy)
+
+begin_proxy = create_proxy(lambda e: asyncio.ensure_future(run_sequence(e)))
+document.querySelector("#btn-begin").addEventListener("click", begin_proxy)
 
 load_state()
+update_status()
 
 # Hide the boot screen once Python is fully ready
 document.getElementById("loading-screen").classList.add("fade-out")

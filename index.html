@@ -78,8 +78,12 @@
         #btn-remove:hover, #btn-clear:hover { background: #888; color: #000; box-shadow: none; }
         
         /* THE FIX: Pushes the run button to the absolute bottom of its container */
-        .btn-success { background: rgba(0, 240, 255, 0.1); color: var(--neon-cyan); border: 1px solid var(--neon-cyan); width: 100%; margin-top: auto; padding: 15px; font-size: 1.1em; font-weight: bold; letter-spacing: 1px; }
+        .btn-success { background: rgba(0, 240, 255, 0.1); color: var(--neon-cyan); border: 1px solid var(--neon-cyan); width: 100%; margin-top: 10px; padding: 15px; font-size: 1.1em; font-weight: bold; letter-spacing: 1px; }
         .btn-success:hover { background: var(--neon-cyan); color: #000; box-shadow: 0 0 20px rgba(0, 240, 255, 0.6); }
+        .btn-success:first-of-type { margin-top: auto; }
+
+        .btn-success:disabled { background: transparent; color: #555; border-color: #555; cursor: not-allowed; opacity: 0.5; box-shadow: none; }
+        .btn-success:disabled:hover { background: transparent; color: #555; box-shadow: none; }
 
         select, input { background: #000; color: var(--text-main); border: 1px solid var(--border-color); font-family: inherit; padding: 8px; border-radius: 3px; }
         select:focus, input:focus { outline: none; border-color: var(--neon-cyan); }
@@ -149,25 +153,6 @@
         </div>
 
         <div class="col">
-            <div class="panel panel-fit">
-                <h3>[ Hardware_Setup ]</h3>
-                <div class="setting-row">
-                    <span>Motor Color:</span>
-                    <select id="motor_color">
-                        <option value="magenta">Magenta</option>
-                        <option value="yellow">Yellow</option>
-                        <option value="blue">Blue</option>
-                        <option value="green">Green</option>
-                        <option value="red">Red</option>
-                        <option value="cyan">Cyan</option>
-                    </select>
-                </div>
-                <div class="setting-row" style="margin-bottom: 0;">
-                    <span>Motor Number:</span>
-                    <input type="number" id="motor_number" value="2014">
-                </div>
-            </div>
-
             <div class="panel">
                 <h3>[ Config_Parameters ]</h3>
                 <div class="setting-row"><span>Forward Speed:</span><input type="number" id="fwd_spd" value="100"></div>
@@ -177,7 +162,8 @@
                 <div class="setting-row"><span>Left Angle:</span><input type="number" id="lft_ang" value="-90"></div>
                 <div class="setting-row"><span>Backward Speed:</span><input type="number" id="bck_spd" value="100"></div>
 
-                <button id="btn-run" class="btn-success">Connect & Execute</button>
+                <button id="btn-connect" class="btn-success">Connect Motor</button>
+                <button id="btn-begin" class="btn-success" disabled>Begin Sequence</button>
             </div>
         </div>
 
