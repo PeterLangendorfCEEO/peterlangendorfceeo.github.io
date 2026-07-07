@@ -11,6 +11,11 @@ DIR_CCW = 1
 
 is_connected = False
 
+def normalize_angle(angle):
+    if angle > 180: return angle - 360
+    elif angle < -180: return angle + 360
+    else: return angle
+
 def print_term(message, color="lime"):
     terminal = document.querySelector("#terminal")
     if terminal:
@@ -68,7 +73,6 @@ async def connect_motor(event):
     is_connected = True
     print_term(f"Handshake complete! Bound to {device_name}.", color="#00ffcc")
     
-    # Wait for Claude's Javascript to capture the Zero Angle
     await asyncio.sleep(1)
 
     document.querySelector("#btn-begin").removeAttribute("disabled")
@@ -127,15 +131,24 @@ async def run_sequence(event):
                 commands = []
                 if move == "forward":
                     speed = int(settings.get("forward_speed", 100))
+                    
+                    # THE FIX: Python securely dictates if the motor should be 0 due to engine failure
+                    l_tgt = speed if not left_failed else 0
+                    r_tgt = speed if not right_failed else 0
+                    if hasattr(window, 'setCurrentTargetSpeeds'): window.setCurrentTargetSpeeds(l_tgt, r_tgt)
+
                     if not left_failed: commands.append({"bitMask": LEFT, "speedPercent": speed, "direction": DIR_CW, "degrees": 864})
                     if not right_failed: commands.append({"bitMask": RIGHT, "speedPercent": speed, "direction": DIR_CCW, "degrees": 864})
-                    if hasattr(window, 'setCurrentTargetSpeeds'): window.setCurrentTargetSpeeds(speed, speed)
 
                 elif move == "back":
                     speed = int(settings.get("backward_speed", 100))
+                    
+                    l_tgt = -speed if not left_failed else 0
+                    r_tgt = -speed if not right_failed else 0
+                    if hasattr(window, 'setCurrentTargetSpeeds'): window.setCurrentTargetSpeeds(l_tgt, r_tgt)
+
                     if not left_failed: commands.append({"bitMask": LEFT, "speedPercent": speed, "direction": DIR_CCW, "degrees": 900})
                     if not right_failed: commands.append({"bitMask": RIGHT, "speedPercent": speed, "direction": DIR_CW, "degrees": 900})
-                    if hasattr(window, 'setCurrentTargetSpeeds'): window.setCurrentTargetSpeeds(-speed, -speed)
 
                 if len(commands) > 0:
                     js_commands = to_js(commands, dict_converter=window.Object.fromEntries)
@@ -149,17 +162,18 @@ async def run_sequence(event):
                 if not left_failed: active_bitmask |= LEFT
                 if not right_failed: active_bitmask |= RIGHT
                 
-                if hasattr(window, 'setCurrentTargetSpeeds'): window.setCurrentTargetSpeeds(speed, speed)
+                l_tgt = speed if not left_failed else 0
+                r_tgt = speed if not right_failed else 0
+                if hasattr(window, 'setCurrentTargetSpeeds'): window.setCurrentTargetSpeeds(l_tgt, r_tgt)
 
                 if active_bitmask > 0:
                     turn_dir = DIR_CW if move == "left" else DIR_CCW
                     
-                    # TRUE CLOSED-LOOP IMU TURN
                     start_angle = window.legoBluetooth.getAngle()
                     if start_angle is None:
                         print_term("Error: IMU data unavailable. Cannot complete turn.", color="red")
                     else:
-                        target_angle = window.legoBluetooth.normalizeAngle(start_angle + target_offset)
+                        target_angle = normalize_angle(start_angle + target_offset)
                         
                         tasks = []
                         tasks.append(asyncio.ensure_future(window.legoBluetooth.runMotorContinuous(active_bitmask, speed, turn_dir)))
@@ -170,7 +184,7 @@ async def run_sequence(event):
                             current = window.legoBluetooth.getAngle()
                             if current is None: break
                             
-                            error = abs(window.legoBluetooth.normalizeAngle(current - target_angle))
+                            error = abs(normalize_angle(current - target_angle))
                             
                             if error < 7.5: break
                             if time.time() - start_time > 15:
@@ -178,7 +192,6 @@ async def run_sequence(event):
                                 break
                             await asyncio.sleep(0.02)
                         
-                        # Hit the brakes
                         await window.legoBluetooth.stopMotor(active_bitmask)
 
         except Exception as e:

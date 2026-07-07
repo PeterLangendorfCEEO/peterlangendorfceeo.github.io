@@ -143,7 +143,7 @@
             <h3 id="checks-counter" style="text-align: center; color: var(--neon-cyan); margin-top: -5px; margin-bottom: 15px; border: 1px solid var(--neon-cyan); padding: 5px 15px; width: max-content; margin-left: auto; margin-right: auto; border-radius: 4px;">CHECKS REMAINING: 3</h3>
             
             <div class="analysis-guide" style="margin-top: 0; margin-bottom: 15px;">
-                <strong>HOW TO PLAY:</strong> You have 3 tries to see if the Hacker changed your code! Click a block on the left, then click the matching block on the right. If it turns <span style="color: var(--neon-green); font-weight: bold;">GREEN</span>, it is safe. If it turns <span style="color: var(--neon-red); font-weight: bold;">RED</span>, it means the Hacker changed it!
+                <strong>HOW TO PLAY:</strong> You have 3 tries to see if the Hacker changed your code! Click a block on the left, then click the matching block on the right. If it turns <span style="color: var(--neon-green); font-weight: bold;">GREEN</span>, it is safe. If it says <span style="color: var(--neon-red); font-weight: bold;">MISMATCH</span>, you clicked the wrong pair. If it says <span style="color: var(--neon-red); font-weight: bold;">BREACHED</span>, the Hacker changed it!
             </div>
             
             <div class="checksum-grid">
@@ -162,7 +162,7 @@
             
             <div style="display: flex; gap: 20px; align-items: stretch; margin-bottom: 5px;">
                 <div class="analysis-guide" style="flex: 1;">
-                    <strong>HOW TO READ THE GRAPH:</strong> Look at the lines to see how the motors moved. A flat line at 0% means the motor is stopped. If a motor's line suddenly drops to 0% when it was supposed to be moving, it means the engine broke!
+                    <strong>HOW TO READ THE GRAPH:</strong> Look at the lines to see how the motors moved. In a healthy robot, the green and blue lines should always be a perfect, beautiful reflection of each other! If one of the lines flatlines at 0%, it means that motor died!
                 </div>
                 <button id="btn-toggle-graph" onclick="toggleGraphMode()" class="btn-success btn-toggle-normal" style="width: auto; margin-top: 0; padding: 10px 20px; height: 100%;">Mode:<br>Normal (Simplified)</button>
             </div>
@@ -329,9 +329,10 @@
                 let pHash = pseudoHash(pItem.id, pItem.value);
                 let rHash = pseudoHash(rItem.id, rItem.value);
 
+                // THE FIX: Hash is now completely visible on the left by default
                 let leftDiv = document.createElement('div');
                 leftDiv.className = 'mem-block';
-                leftDiv.innerHTML = `<span>${pItem.label}: <span style="color:#e0e0e0;">${pItem.value}</span></span><span class="hash-text">[ SELECT ]</span>`;
+                leftDiv.innerHTML = `<span>${pItem.label}: <span style="color:#e0e0e0;">${pItem.value}</span></span><span class="hash-text">${pHash}</span>`;
                 
                 let arrowDiv = document.createElement('div');
                 arrowDiv.className = 'match-arrow';
@@ -369,18 +370,26 @@
                 checksRemaining--;
                 document.getElementById('checks-counter').innerText = `CHECKS REMAINING: ${checksRemaining}`;
 
-                if (selLeft.hash === selRight.hash) {
+                // THE FIX: Throws MISMATCH if they didn't click the exact same row!
+                if (selLeft.index !== selRight.index) {
+                    selLeft.el.querySelector('.hash-text').innerText = selLeft.hash + " [ MISMATCH ]";
+                    selRight.el.querySelector('.hash-text').innerText = selRight.hash + " [ MISMATCH ]";
+                    selLeft.el.classList.add('match-fail');
+                    selRight.el.classList.add('match-fail');
+                } 
+                else if (selLeft.hash === selRight.hash) {
                     selLeft.el.querySelector('.hash-text').innerText = selLeft.hash + " [ VERIFIED ]";
                     selRight.el.querySelector('.hash-text').innerText = selRight.hash + " [ VERIFIED ]";
                     selLeft.el.classList.add('match-success');
                     selRight.el.classList.add('match-success');
-                    if(selLeft.index === selRight.index) selLeft.arrow.classList.add('success');
-                } else {
-                    selLeft.el.querySelector('.hash-text').innerText = selLeft.hash + " [ MISMATCH ]";
+                    selLeft.arrow.classList.add('success');
+                } 
+                else {
+                    selLeft.el.querySelector('.hash-text').innerText = selLeft.hash + " [ BREACHED ]";
                     selRight.el.querySelector('.hash-text').innerText = selRight.hash + " [ BREACHED ]";
                     selLeft.el.classList.add('match-fail');
                     selRight.el.classList.add('match-fail');
-                    if(selLeft.index === selRight.index) selLeft.arrow.classList.add('fail');
+                    selLeft.arrow.classList.add('fail');
                 }
                 
                 selLeft.el.classList.remove('selected');
@@ -405,6 +414,14 @@
         
         window.currentMoveLabel = "IDLE"; 
         
+        let t_leftSpeed = 0;
+        let t_rightSpeed = 0;
+
+        window.setCurrentTargetSpeeds = function(left, right) {
+            t_leftSpeed = left;
+            t_rightSpeed = right;
+        };
+
         function toggleGraphMode() {
             graphMode = graphMode === 'normal' ? 'advanced' : 'normal';
             const btn = document.getElementById('btn-toggle-graph');
@@ -447,7 +464,9 @@
                                 t: Date.now() - recordStartMs,
                                 left: lVal,
                                 right: rVal,
-                                move: window.currentMoveLabel
+                                move: window.currentMoveLabel,
+                                tgtLeft: t_leftSpeed,
+                                tgtRight: t_rightSpeed
                             });
                         }
                     }
@@ -474,6 +493,7 @@
             }
             if (currentRegion) regions.push(currentRegion);
 
+            // Dynamic Width for Horizontal Scrolling
             let displayRegions = regions.filter(r => r.move !== 'IDLE' && r.move !== 'END');
             let targetWidth = 900;
             if (displayRegions.length > 6) {
@@ -561,18 +581,20 @@
                             continue;
                         }
 
-                        let maxAbs = 0;
-                        let maxVal = 0;
+                        let isActive = false;
                         for (let p of pts) {
-                            if (Math.abs(p[key]) > maxAbs) {
-                                maxAbs = Math.abs(p[key]);
-                                maxVal = p[key];
+                            let tgt = key === 'left' ? p.tgtLeft : p.tgtRight;
+                            if (tgt !== 0) {
+                                isActive = true;
+                                break;
                             }
                         }
 
                         let amp = 0;
-                        if (maxAbs > 5) {
-                            amp = Math.sign(maxVal) * 100;
+                        if (isActive) {
+                            // THE FIX: Forces Left to ALWAYS be +100 and Right to ALWAYS be -100
+                            // creating a perfect reflection across the X-Axis regardless of turn direction!
+                            amp = (key === 'left') ? 100 : -100;
                         }
 
                         let activeEnd = Math.max(reg.start + 100, reg.end - 500);
@@ -597,7 +619,10 @@
                     for (let i = 0; i < pts.length; i++) {
                         const pt = pts[i];
                         const x = leftPad + (pt.t / maxT) * (w - leftPad - pad);
+                        
+                        // yOffset removed because Left and Right are now perfectly separated (+100 and -100)
                         const y = h/2 - (pt.val / 100) * (h/2 - pad);
+                        
                         if (i === 0) ctx.moveTo(x, y);
                         else ctx.lineTo(x, y);
                     }
@@ -616,7 +641,11 @@
                     for (let i = 0; i < telemetryHistory.length; i++) {
                         const pt = telemetryHistory[i];
                         const x = leftPad + (pt.t / maxT) * (w - leftPad - pad);
-                        const y = h/2 - (pt[key] / 100) * (h/2 - pad);
+                        
+                        // Keep a tiny offset for raw overlapping data
+                        const yOffset = (key === 'right') ? 4 : 0;
+                        const y = h/2 - (pt[key] / 100) * (h/2 - pad) + yOffset;
+                        
                         if (i === 0) ctx.moveTo(x, y);
                         else ctx.lineTo(x, y);
                     }
@@ -648,8 +677,8 @@
         }
     </script>
 
-    <script src="bluetooth.js?v=14.0"></script>
-    <script type="py" src="app.py?v=14.0"></script>
+    <script src="bluetooth.js?v=16.0"></script>
+    <script type="py" src="app.py?v=16.0"></script>
 
 </body>
 </html>
