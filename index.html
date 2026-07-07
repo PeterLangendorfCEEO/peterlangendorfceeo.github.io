@@ -87,7 +87,6 @@
 
         #footer-status { position: fixed; bottom: 0; left: 0; width: 100%; background: #08080c; border-top: 1px solid var(--border-color); padding: 12px; text-align: center; color: #888; z-index: 100; box-shadow: 0 -5px 15px rgba(0,0,0,0.5); }
 
-        /* --- MODAL ENGINE --- */
         .modal-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.9); backdrop-filter: blur(8px); z-index: 200; display: flex; justify-content: center; align-items: center; }
         .modal-content { background: var(--panel-bg); border: 2px solid var(--neon-cyan); padding: 30px; border-radius: 8px; width: 95%; max-width: 1000px; box-shadow: 0 0 40px rgba(0, 240, 255, 0.15); display: flex; flex-direction: column; max-height: 90vh; }
         
@@ -108,7 +107,7 @@
         .match-success .hash-text { color: var(--neon-green); font-weight: bold; }
         .match-fail .hash-text { color: var(--neon-red); font-weight: bold; }
 
-        /* --- UPDATED CANVAS CONTAINER FOR SCROLLING --- */
+        /* --- UPDATED CANVAS CONTAINER --- */
         .canvas-container { width: 100%; overflow-x: auto; overflow-y: hidden; background: #000; border: 1px solid var(--border-color); border-radius: 4px; box-shadow: inset 0 0 15px rgba(0,0,0,0.8); margin-top: 15px; }
         .canvas-container::-webkit-scrollbar { height: 8px; }
         .canvas-container::-webkit-scrollbar-track { background: #000; }
@@ -149,7 +148,7 @@
     <div id="sensor-overlay" class="modal-overlay" style="display: none;">
         <div class="modal-content">
             <h2 style="text-align: center; color: var(--neon-cyan); margin-top: 0; text-shadow: 0 0 10px rgba(0,240,255,0.4);">[ SENSOR TELEMETRY LOG ]</h2>
-            <p style="text-align: center; color: #888; margin-top: -10px;">Hardware RPM plotted against Programmer's intended instructions.</p>
+            <p style="text-align: center; color: #888; margin-top: -10px;">Hardware RPM filtered and plotted against Programmer instructions.</p>
             
             <div class="canvas-container">
                 <canvas id="sensor-canvas" width="900" height="400"></canvas>
@@ -380,7 +379,7 @@
             }
         }
 
-        // --- ENHANCED CANVAS ENGINE ---
+        // --- FILTERED CANVAS ENGINE ---
         let telemetryTimer = null;
         let telemetryHistory = [];
         let isRecording = false;
@@ -388,14 +387,6 @@
         
         window.currentMoveLabel = "IDLE"; 
         
-        let t_leftSpeed = 0;
-        let t_rightSpeed = 0;
-
-        window.setCurrentTargetSpeeds = function(left, right) {
-            t_leftSpeed = left;
-            t_rightSpeed = right;
-        };
-
         window.startRecording = function() {
             telemetryHistory = [];
             isRecording = true;
@@ -436,10 +427,10 @@
         function drawSensorGraph() {
             const canvas = document.getElementById('sensor-canvas');
             const ctx = canvas.getContext('2d');
-            const h = canvas.height; 
+            const h = 400; // Fixed canvas height
             const pad = 40;
+            const leftPad = 60; // Extra padding for Y-Axis labels
             
-            // 1. Calculate dynamic width for scrolling
             let regions = [];
             let currentRegion = null;
             for (let pt of telemetryHistory) {
@@ -452,18 +443,15 @@
             }
             if (currentRegion) regions.push(currentRegion);
 
+            // Dynamic Width for Horizontal Scrolling
             let displayRegions = regions.filter(r => r.move !== 'IDLE' && r.move !== 'END');
             let targetWidth = 900;
             if (displayRegions.length > 6) {
-                targetWidth = pad * 2 + (displayRegions.length * 150); 
+                targetWidth = leftPad + pad + (displayRegions.length * 130); 
             }
             
-            // Modifying canvas.width automatically clears it
-            if (canvas.width !== targetWidth) {
-                canvas.width = targetWidth;
-            } else {
-                ctx.clearRect(0, 0, canvas.width, h);
-            }
+            if (canvas.width !== targetWidth) canvas.width = targetWidth;
+            else ctx.clearRect(0, 0, canvas.width, h);
             
             const w = canvas.width;
 
@@ -475,7 +463,7 @@
                 return;
             }
             
-            const maxT = telemetryHistory[telemetryHistory.length - 1].t;
+            const maxT = Math.max(1, telemetryHistory[telemetryHistory.length - 1].t);
             
             // --- DRAW Y-AXIS GRID LINES (-100 to 100) ---
             ctx.font = '12px Share Tech Mono';
@@ -485,15 +473,15 @@
             for (let speed = -100; speed <= 100; speed += 20) {
                 const y = h/2 - (speed / 100) * (h/2 - pad);
                 
-                ctx.strokeStyle = speed === 0 ? '#2a2a35' : 'rgba(255, 255, 255, 0.1)';
+                ctx.strokeStyle = speed === 0 ? '#444' : 'rgba(255, 255, 255, 0.1)';
                 ctx.lineWidth = speed === 0 ? 2 : 1;
                 ctx.beginPath(); 
-                ctx.moveTo(pad, y); 
+                ctx.moveTo(leftPad, y); 
                 ctx.lineTo(w - pad, y); 
                 ctx.stroke();
 
-                ctx.fillStyle = '#888';
-                ctx.fillText(speed, pad - 5, y);
+                ctx.fillStyle = speed === 0 ? '#fff' : '#888';
+                ctx.fillText(speed, leftPad - 10, y);
             }
 
             // --- DRAW REGION DASHED BORDERS & ARROWS ---
@@ -504,8 +492,8 @@
             for (let reg of regions) {
                 if (reg.move === 'IDLE' || reg.move === 'END') continue;
 
-                let startX = pad + (reg.start / maxT) * (w - 2 * pad);
-                let endX = pad + (reg.end / maxT) * (w - 2 * pad);
+                let startX = leftPad + (reg.start / maxT) * (w - leftPad - pad);
+                let endX = leftPad + (reg.end / maxT) * (w - leftPad - pad);
 
                 ctx.strokeStyle = '#555';
                 ctx.setLineDash([5, 5]);
@@ -515,7 +503,7 @@
                 ctx.stroke();
                 ctx.setLineDash([]);
 
-                let arrowY = pad / 2;
+                let arrowY = pad / 2 + 15;
                 ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
                 ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
                 ctx.lineWidth = 1;
@@ -529,23 +517,67 @@
                 ctx.fillText(reg.move, (startX + endX) / 2, arrowY - 5);
             }
 
-            // --- DRAW MOTOR SPEEDS ---
-            function drawLine(key, color) {
+            // --- DRAW FILTERED TRAPEZOIDS ---
+            function getSimplifiedPoints(key) {
+                let simplified = [];
+                for (let reg of regions) {
+                    let pts = telemetryHistory.filter(p => p.t >= reg.start && p.t <= reg.end);
+                    if (pts.length === 0) continue;
+
+                    if (reg.move === 'IDLE' || reg.move === 'END') {
+                        simplified.push({ t: reg.start, val: 0 });
+                        simplified.push({ t: reg.end, val: 0 });
+                        continue;
+                    }
+
+                    // Scan raw data to see if the motor was actually moving
+                    let maxAbs = 0;
+                    let maxVal = 0;
+                    for (let p of pts) {
+                        if (Math.abs(p[key]) > maxAbs) {
+                            maxAbs = Math.abs(p[key]);
+                            maxVal = p[key];
+                        }
+                    }
+
+                    let amp = 0;
+                    // If motor is not completely dead, force amplitude to full 100 for easy visual reading
+                    if (maxAbs > 5) {
+                        amp = Math.sign(maxVal) * 100;
+                    }
+
+                    // Pull back the trapezoid end to account for app.py's 0.5s sleep delay between instructions
+                    let activeEnd = Math.max(reg.start + 100, reg.end - 500);
+                    let activeDuration = activeEnd - reg.start;
+                    let ramp = Math.min(200, activeDuration * 0.2); // Ramp up over 200ms
+
+                    simplified.push({ t: reg.start, val: 0 });
+                    simplified.push({ t: reg.start + ramp, val: amp });
+                    simplified.push({ t: activeEnd - ramp, val: amp });
+                    simplified.push({ t: activeEnd, val: 0 });
+                    simplified.push({ t: reg.end, val: 0 });
+                }
+                return simplified;
+            }
+
+            function drawSimplifiedLine(key, color) {
+                const pts = getSimplifiedPoints(key);
                 ctx.strokeStyle = color;
-                ctx.lineWidth = 2;
+                ctx.lineWidth = 3;
+                ctx.lineJoin = 'round';
                 ctx.beginPath();
-                for (let i = 0; i < telemetryHistory.length; i++) {
-                    const pt = telemetryHistory[i];
-                    const x = pad + (pt.t / maxT) * (w - 2 * pad);
-                    const y = h/2 - (pt[key] / 100) * (h/2 - pad);
+                for (let i = 0; i < pts.length; i++) {
+                    const pt = pts[i];
+                    const x = leftPad + (pt.t / maxT) * (w - leftPad - pad);
+                    const y = h/2 - (pt.val / 100) * (h/2 - pad);
                     if (i === 0) ctx.moveTo(x, y);
                     else ctx.lineTo(x, y);
                 }
                 ctx.stroke();
             }
             
-            drawLine('left', '#00ff41');
-            drawLine('right', '#00f0ff');
+            drawSimplifiedLine('left', '#00ff41');
+            drawSimplifiedLine('right', '#00f0ff');
         }
 
         const listbox = document.getElementById('move-listbox');
@@ -568,8 +600,8 @@
         }
     </script>
 
-    <script src="bluetooth.js?v=11.0"></script>
-    <script type="py" src="app.py?v=11.0"></script>
+    <script src="bluetooth.js?v=12.0"></script>
+    <script type="py" src="app.py?v=12.0"></script>
 
 </body>
 </html>
