@@ -3,15 +3,17 @@ window.legoBluetooth = {
     client: null,
     writeChar: null,
     notifyChar: null,
-    _pending: {},   // resultId -> [resolve, ...] FIFO queues
+    
+    _pending: {},   
+    _writeQueue: [],
+    _isWriting: false,
 
     // Confirmed via chrome://bluetooth-internals against the real hardware.
     SERVICE_UUID: '0000fd02-0000-1000-8000-00805f9b34fb',
     WRITE_UUID:   '0000fd02-0001-1000-8000-00805f9b34fb',
     NOTIFY_UUID:  '0000fd02-0002-1000-8000-00805f9b34fb',
 
-    // Message type IDs, ported from legoeducation/rpc_message.py.
-    // Every *_RESULT id is simply *_COMMAND id + 1.
+    // Message type IDs
     INFO_REQUEST: 0,
     INFO_RESPONSE: 1,
     MOTOR_RUN_COMMAND: 122,
@@ -38,7 +40,7 @@ window.legoBluetooth = {
         try {
             console.log("Requesting Web Bluetooth Connection...");
 
-            // THE FIX: Enforces a strict filter for the LEGO Double Motor
+            // THE FIX: Filters the pairing menu to ONLY show LEGO Double Motors
             this.device = await navigator.bluetooth.requestDevice({
                 filters: [{ services: [this.SERVICE_UUID] }]
             });
@@ -63,8 +65,8 @@ window.legoBluetooth = {
             const rpcBuild = infoResponse[2] | (infoResponse[3] << 8);
             console.log(`Handshake complete. Device RPC version: ${rpcMajor}.${rpcMinor}.${rpcBuild}`);
 
-            // Returns the physical device name (e.g. "LEGO Hub") to Python
-            return this.device.name || "Double Motor";
+            // THE FIX: Return the actual device name to Python so the footer updates!
+            return this.device.name || "DOUBLE MOTOR";
 
         } catch (error) {
             console.error("Web Bluetooth Error: ", error);
@@ -81,39 +83,65 @@ window.legoBluetooth = {
             const resolve = queue.shift();
             resolve(payload);
         }
-
-        // Log motor command results for visibility, regardless of whether
-        // something is actively awaiting them.
-        if (msgType === this.MOTOR_SET_SPEED_RESULT ||
-            msgType === this.MOTOR_RUN_FOR_DEGREES_RESULT ||
-            msgType === this.MOTOR_RUN_RESULT ||
-            msgType === this.MOTOR_STOP_RESULT) {
-            const bitMask = payload[0];
-            const status = payload[1];
-            console.log(`Result for msgType ${msgType}: motor bitmask ${bitMask}, ` +
-                        `status ${this.STATUS_LABEL[status] || status}`);
-        }
     },
 
-    _sendAndWait: function(bytes, expectedResultType, timeoutMs = 4000) {
+    // --- THE GATT MUTEX ---
+    // This processes Bluetooth writes one at a time, spaced 30ms apart, completely fixing the crash.
+    _processWriteQueue: async function() {
+        if (this._isWriting || this._writeQueue.length === 0) return;
+        this._isWriting = true;
+        const task = this._writeQueue.shift();
+        
+        try {
+            await this.writeChar.writeValueWithoutResponse(task.bytes);
+            await new Promise(r => setTimeout(r, 30)); 
+            task.resolve();
+        } catch (e) {
+            task.reject(e);
+        }
+        
+        this._isWriting = false;
+        this._processWriteQueue();
+    },
+
+    _safeWrite: function(bytes) {
+        return new Promise((resolve, reject) => {
+            this._writeQueue.push({ bytes, resolve, reject });
+            this._processWriteQueue();
+        });
+    },
+
+    _sendAndWait: function(bytes, expectedResultType, timeoutMs = 4000, blocking = true) {
         return new Promise(async (resolve, reject) => {
             if (!this._pending[expectedResultType]) this._pending[expectedResultType] = [];
-            const timer = setTimeout(() => reject(new Error(`Timed out waiting for result type ${expectedResultType}`)), timeoutMs);
-            this._pending[expectedResultType].push((payload) => {
-                clearTimeout(timer);
-                resolve(payload);
-            });
+            
+            let timer;
+            if (blocking) {
+                // Only start the timeout timer if we actually care about waiting for the motor to finish turning
+                timer = setTimeout(() => reject(new Error(`Timed out waiting for result type ${expectedResultType}`)), timeoutMs);
+                this._pending[expectedResultType].push((payload) => {
+                    clearTimeout(timer);
+                    resolve(payload);
+                });
+            }
+            
             try {
-                await this.writeChar.writeValueWithoutResponse(bytes);
+                // Send the command through the Mutex Queue
+                await this._safeWrite(bytes);
+                
+                if (!blocking) {
+                    // THE FIX: If blocking=False, resolve immediately after sending the BLE payload
+                    // so Python can instantly send the next payload to the other motor!
+                    resolve(null); 
+                }
             } catch (error) {
-                clearTimeout(timer);
+                if (timer) clearTimeout(timer);
                 reject(error);
             }
         });
     },
 
-    // --- Message builders (mirror rpc_message.py exactly: header byte, no length prefix) ---
-
+    // --- Message builders ---
     _buildSetSpeed: function(bitMask, speed) {
         return new Uint8Array([this.MOTOR_SET_SPEED_COMMAND, bitMask, speed & 0xFF]);
     },
@@ -143,15 +171,14 @@ window.legoBluetooth = {
         return out;
     },
 
-    // --- Public motor commands. speed is 0-100 (magnitude only); use `direction` for rotation sense. ---
-
-    runMotorForDegrees: async function(bitMask, speedPercent, direction, degrees) {
-        // Real client sends SetSpeed + RunForDegrees concatenated into ONE write.
+    // --- Public motor commands ---
+    // Added "blocking" parameter to match the original Python library behavior
+    runMotorForDegrees: async function(bitMask, speedPercent, direction, degrees, blocking = true) {
         const combined = this._concat(
             this._buildSetSpeed(bitMask, speedPercent),
             this._buildRunForDegrees(bitMask, degrees, direction)
         );
-        return this._sendAndWait(combined, this.MOTOR_RUN_FOR_DEGREES_RESULT);
+        return this._sendAndWait(combined, this.MOTOR_RUN_FOR_DEGREES_RESULT, 4000, blocking);
     },
 
     runMotorContinuous: async function(bitMask, speedPercent, direction) {
