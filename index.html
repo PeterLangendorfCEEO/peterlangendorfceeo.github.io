@@ -99,7 +99,7 @@
             box-shadow: 0 0 40px rgba(0, 240, 255, 0.15); display: flex; flex-direction: column; max-height: 90vh;
         }
         .checksum-split {
-            display: flex; gap: 30px; margin-top: 20px; overflow-y: auto; padding-right: 10px;
+            display: flex; gap: 30px; margin-top: 15px; overflow-y: auto; padding-right: 10px;
         }
         .checksum-col {
             flex: 1; display: flex; flex-direction: column; gap: 8px;
@@ -138,7 +138,8 @@
     <div id="checksum-overlay" style="display: none;">
         <div class="checksum-modal">
             <h2 style="text-align: center; color: var(--neon-cyan); margin-top: 0; text-shadow: 0 0 10px rgba(0,240,255,0.4);">[ SECURE SHA256 MEMORY AUDIT ]</h2>
-            <p style="text-align: center; color: #888; margin-top: -10px;">Select a memory block on the left and compare it to a block on the right to verify payload integrity.</p>
+            <h3 id="checks-counter" style="text-align: center; color: var(--neon-cyan); margin-top: -5px; border: 1px solid var(--neon-cyan); padding: 5px; width: max-content; margin-left: auto; margin-right: auto;">CHECKS REMAINING: 3</h3>
+            <p style="text-align: center; color: #888; margin-top: -5px;">Select a memory block on the left and compare it to an encrypted block on the right to verify payload integrity.</p>
             
             <div class="checksum-split">
                 <div class="checksum-col">
@@ -202,7 +203,7 @@
                 <button id="btn-connect" class="btn-success" style="margin-top: 0;">Connect Motor via Bluetooth</button>
                 <button id="btn-begin" class="btn-success" disabled>Execute Payload</button>
                 
-                <button onclick="openChecksum()" class="btn-success" style="margin-top: 25px; border-color: var(--neon-cyan); color: var(--neon-cyan); background: rgba(0, 240, 255, 0.05);">Run Diagnostics (Memory Audit)</button>
+                <button id="btn-diagnostics" onclick="openChecksum()" class="btn-success" style="margin-top: 25px; border-color: var(--neon-cyan); color: var(--neon-cyan); background: rgba(0, 240, 255, 0.05);" disabled>Run Diagnostics (Memory Audit)</button>
             </div>
         </div>
 
@@ -220,8 +221,8 @@
         // --- GAMIFICATION & STATE ENGINE ---
         let programmerState = [];
         let robotState = [];
+        let checksRemaining = 3;
 
-        // Secretly grabs everything the user has typed/selected on the screen
         function captureState() {
             let state = [];
             const moves = document.getElementById('move-listbox').children;
@@ -243,7 +244,6 @@
         }
 
         function goToPhase2() {
-            // Snapshot the innocent programmer's configuration
             programmerState = captureState();
 
             document.getElementById('panel-sequence').classList.remove('panel-center');
@@ -262,9 +262,8 @@
         }
 
         function goToPhase3() {
-            // Snapshot the final malicious configuration just before the UI vanishes
             robotState = captureState();
-            renderChecksumLists(); // Builds the modal in the background
+            renderChecksumLists();
 
             document.getElementById('step-builder').style.display = 'none';
             document.getElementById('step-execution').style.display = 'flex';
@@ -282,7 +281,6 @@
             document.getElementById('checksum-overlay').style.display = 'none';
         }
 
-        // Fake Hash generator (Ensures identical values = identical hashes)
         function pseudoHash(id, val) {
             let str = id + ":" + val;
             let hash = 0;
@@ -294,6 +292,9 @@
         }
 
         function renderChecksumLists() {
+            checksRemaining = 3;
+            document.getElementById('checks-counter').innerText = `CHECKS REMAINING: ${checksRemaining}`;
+            
             const leftCol = document.getElementById('list-programmer');
             const rightCol = document.getElementById('list-robot');
             leftCol.innerHTML = ''; rightCol.innerHTML = '';
@@ -311,7 +312,8 @@
                 let hash = pseudoHash(item.id, item.value);
                 let div = document.createElement('div');
                 div.className = 'mem-block';
-                div.innerHTML = `<span>${item.label}: <span style="color:#e0e0e0;">${item.value}</span></span><span class="hash-text">[ SELECT ]</span>`;
+                // Completely mask the live robot memory. Never show the label or value.
+                div.innerHTML = `<span>Encrypted Memory Block [${index}]</span><span class="hash-text">[ SELECT ]</span>`;
                 div.onclick = () => selectBlock('right', index, hash, div);
                 rightCol.appendChild(div);
             });
@@ -321,7 +323,8 @@
         }
 
         function selectBlock(side, index, hash, element) {
-            // Un-select previous choice on the same side
+            if (checksRemaining <= 0) return;
+
             if (side === 'left') {
                 if (selLeft) selLeft.el.classList.remove('selected');
                 selLeft = { index, hash, el: element };
@@ -332,8 +335,10 @@
                 element.classList.add('selected');
             }
 
-            // If both sides are selected, evaluate the breach!
             if (selLeft && selRight) {
+                checksRemaining--;
+                document.getElementById('checks-counter').innerText = `CHECKS REMAINING: ${checksRemaining}`;
+
                 if (selLeft.hash === selRight.hash) {
                     selLeft.el.querySelector('.hash-text').innerText = selLeft.hash + " [ VERIFIED ]";
                     selRight.el.querySelector('.hash-text').innerText = selRight.hash + " [ VERIFIED ]";
@@ -341,7 +346,7 @@
                     selRight.el.classList.add('match-success');
                 } else {
                     selLeft.el.querySelector('.hash-text').innerText = selLeft.hash + " [ MISMATCH ]";
-                    selRight.el.querySelector('.hash-text').innerText = selRight.hash + " [ CORRUPTED ]";
+                    selRight.el.querySelector('.hash-text').innerText = selRight.hash + " [ BREACHED ]";
                     selLeft.el.classList.add('match-fail');
                     selRight.el.classList.add('match-fail');
                 }
@@ -351,6 +356,13 @@
                 
                 selLeft = null;
                 selRight = null;
+
+                if (checksRemaining <= 0) {
+                    document.querySelectorAll('.mem-block:not(.match-success):not(.match-fail)').forEach(el => {
+                        el.style.pointerEvents = 'none';
+                        el.style.opacity = '0.4';
+                    });
+                }
             }
         }
 
