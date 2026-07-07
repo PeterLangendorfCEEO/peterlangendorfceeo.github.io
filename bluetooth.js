@@ -35,7 +35,6 @@ window.legoBluetooth = {
         try {
             console.log("Requesting Web Bluetooth Connection...");
 
-            // THE FIX: Strict Double Motor Filter Restored
             this.device = await navigator.bluetooth.requestDevice({
                 filters: [{ services: [this.SERVICE_UUID] }]
             });
@@ -138,7 +137,6 @@ window.legoBluetooth = {
         }
     },
 
-    // THE FIX: The Transmission Mutex. Prevents Python commands from crashing the radio.
     _processWriteQueue: async function() {
         if (this._isWriting || this._writeQueue.length === 0) return;
         this._isWriting = true;
@@ -163,7 +161,6 @@ window.legoBluetooth = {
         });
     },
 
-    // THE FIX: Safe timeout handling (resolves to null instead of violently rejecting promises)
     _sendAndWait: function(bytes, expectedResultType, timeoutMs = 4000, blocking = true) {
         return new Promise(async (resolve, reject) => {
             if (!this._pending[expectedResultType]) this._pending[expectedResultType] = [];
@@ -221,7 +218,6 @@ window.legoBluetooth = {
         return Promise.all(waiters);
     },
 
-    // THE FIX: Uses blocking=false so Python can safely control the while-loop
     runMotorContinuous: async function(bitMask, speedPercent, direction) {
         const combined = this._concat(this._buildSetSpeed(bitMask, speedPercent), this._buildRun(bitMask, direction));
         return this._sendAndWait(combined, this.MOTOR_RUN_RESULT, 4000, false);

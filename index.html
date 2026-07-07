@@ -377,6 +377,15 @@
         let recordStartMs = 0;
         
         window.currentMoveLabel = "IDLE"; 
+        
+        let t_leftSpeed = 0;
+        let t_rightSpeed = 0;
+
+        // THE FIX: This function prevents the Python crash
+        window.setCurrentTargetSpeeds = function(left, right) {
+            t_leftSpeed = left;
+            t_rightSpeed = right;
+        };
 
         window.startRecording = function() {
             telemetryHistory = [];
@@ -393,7 +402,6 @@
             if (!telemetryTimer) {
                 telemetryTimer = setInterval(() => {
                     if(window.legoBluetooth) {
-                        // THE FIX: Directly polls the Javascript firmware array instead of using dummy targets!
                         let left = window.legoBluetooth.getMotorSpeed(1);
                         let right = window.legoBluetooth.getMotorSpeed(2);
                         
@@ -448,7 +456,6 @@
             }
             if (currentRegion) regions.push(currentRegion);
 
-            // THE FIX: Draw precise Start/End vertical lines and center the `<---- INSTRUCTION ---->` arrow!
             ctx.font = '14px Share Tech Mono';
             ctx.textBaseline = 'bottom';
             ctx.textAlign = 'center';
@@ -472,14 +479,10 @@
                 ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
                 ctx.lineWidth = 1;
 
-                // Draw the line body
                 ctx.beginPath(); ctx.moveTo(startX + 10, arrowY); ctx.lineTo(endX - 10, arrowY); ctx.stroke();
-                // Draw Left head
                 ctx.beginPath(); ctx.moveTo(startX + 10, arrowY); ctx.lineTo(startX + 15, arrowY - 4); ctx.lineTo(startX + 15, arrowY + 4); ctx.fill();
-                // Draw Right head
                 ctx.beginPath(); ctx.moveTo(endX - 10, arrowY); ctx.lineTo(endX - 15, arrowY - 4); ctx.lineTo(endX - 15, arrowY + 4); ctx.fill();
 
-                // Center the text above the arrow
                 ctx.fillText(reg.move, (startX + endX) / 2, arrowY - 5);
             }
 
@@ -521,8 +524,8 @@
         }
     </script>
 
-    <script src="bluetooth.js?v=8.0"></script>
-    <script type="py" src="app.py?v=8.0"></script>
+    <script src="bluetooth.js?v=9.0"></script>
+    <script type="py" src="app.py?v=9.0"></script>
 
 </body>
 </html>
