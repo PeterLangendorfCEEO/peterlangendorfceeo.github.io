@@ -107,7 +107,6 @@ async def run_sequence(event):
         "left_angle": document.querySelector("#lft_ang").value,
     }
 
-    # PRE-CALCULATE THE MOTOR FAILURES FOR THE UI DEDUCTION BOARD
     failures_list = []
     for _ in move_set:
         failed = False
@@ -207,6 +206,9 @@ async def run_sequence(event):
         except Exception as e:
             print_term(f"Command failed or timed out: {e}", color="red")
 
+        # THE GRAPH FIX: Drops the graph to 0 to separate back-to-back identical moves
+        window.currentMoveLabel = "IDLE"
+        if hasattr(window, 'setCurrentTargetSpeeds'): window.setCurrentTargetSpeeds(0, 0)
         await asyncio.sleep(0.5)
 
     window.currentMoveLabel = "IDLE"

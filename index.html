@@ -298,6 +298,7 @@
         let programmerState = [];
         let robotState = [];
         let deductionState = []; 
+        let auditPairs = []; // Stores perfectly aligned sequences
         let checksRemaining = 3;
 
         function captureState() {
@@ -335,18 +336,65 @@
             document.getElementById('attacker-overlay').style.display = 'none';
         }
 
+        function buildAlignment() {
+            let pMoves = programmerState.filter(x => x.id.startsWith('MOVE_'));
+            let rMoves = robotState.filter(x => x.id.startsWith('MOVE_'));
+            let pSettings = programmerState.filter(x => !x.id.startsWith('MOVE_'));
+            let rSettings = robotState.filter(x => !x.id.startsWith('MOVE_'));
+
+            auditPairs = [];
+
+            // Longest Common Subsequence (LCS) alignment for Move Arrays
+            let matrix = Array(pMoves.length + 1).fill().map(() => Array(rMoves.length + 1).fill(0));
+            for(let i=1; i<=pMoves.length; i++) {
+                for(let j=1; j<=rMoves.length; j++) {
+                    if(pMoves[i-1].value === rMoves[j-1].value) {
+                        matrix[i][j] = matrix[i-1][j-1] + 1;
+                    } else {
+                        matrix[i][j] = Math.max(matrix[i-1][j], matrix[i][j-1]);
+                    }
+                }
+            }
+            
+            let i = pMoves.length, j = rMoves.length;
+            let tempMoves = [];
+            while(i > 0 && j > 0) {
+                if(pMoves[i-1].value === rMoves[j-1].value) {
+                    tempMoves.unshift({ pItem: pMoves[i-1], rItem: rMoves[j-1], isMove: true });
+                    i--; j--;
+                } else if (matrix[i-1][j] > matrix[i][j-1]) {
+                    tempMoves.unshift({ pItem: pMoves[i-1], rItem: null, isMove: true });
+                    i--;
+                } else {
+                    tempMoves.unshift({ pItem: null, rItem: rMoves[j-1], isMove: true });
+                    j--;
+                }
+            }
+            while(i > 0) { tempMoves.unshift({ pItem: pMoves[i-1], rItem: null, isMove: true }); i--; }
+            while(j > 0) { tempMoves.unshift({ pItem: null, rItem: rMoves[j-1], isMove: true }); j--; }
+
+            auditPairs.push(...tempMoves);
+
+            // Settings map 1-to-1 based on ID perfectly
+            for(let s=0; s<pSettings.length; s++) {
+                auditPairs.push({ pItem: pSettings[s], rItem: rSettings[s], isMove: false });
+            }
+        }
+
         function goToPhase3() {
             robotState = captureState();
             
             deductionState = []; 
             document.getElementById('deduction-list').innerHTML = '';
             
+            buildAlignment();
             renderChecksumLists();
+            
             document.getElementById('step-builder').style.display = 'none';
             document.getElementById('step-execution').style.display = 'flex';
         }
 
-        // --- CHECKSUM DIAGNOSTICS ---
+        // --- ALIGNED CHECKSUM DIAGNOSTICS ---
         let selLeft = null;
         let selRight = null;
 
@@ -367,15 +415,19 @@
             const grid = document.querySelector('.checksum-grid');
             while (grid.children.length > 3) { grid.removeChild(grid.lastChild); }
             
-            for(let i=0; i<programmerState.length; i++) {
-                let pItem = programmerState[i];
-                let rItem = robotState[i];
-                let pHash = pseudoHash(pItem.id, pItem.value);
-                let rHash = pseudoHash(rItem.id, rItem.value);
+            for(let i=0; i<auditPairs.length; i++) {
+                let pair = auditPairs[i];
+                
+                let pHash = pair.pItem ? pseudoHash(pair.pItem.id, pair.pItem.value) : "0x00000000";
+                let rHash = pair.rItem ? pseudoHash(pair.rItem.id, pair.rItem.value) : "0x00000000";
 
                 let leftDiv = document.createElement('div');
                 leftDiv.className = 'mem-block';
-                leftDiv.innerHTML = `<span>${pItem.label}: <span style="color:#e0e0e0;">${pItem.value}</span></span><span class="hash-text">${pHash}</span>`;
+                if (pair.pItem) {
+                    leftDiv.innerHTML = `<span>${pair.pItem.label}: <span style="color:#e0e0e0;">${pair.pItem.value}</span></span><span class="hash-text">${pHash}</span>`;
+                } else {
+                    leftDiv.innerHTML = `<span><span style="color:#e0e0e0;">[ DELETED / EMPTY ]</span></span><span class="hash-text">${pHash}</span>`;
+                }
                 
                 let arrowDiv = document.createElement('div');
                 arrowDiv.className = 'match-arrow';
@@ -384,7 +436,11 @@
 
                 let rightDiv = document.createElement('div');
                 rightDiv.className = 'mem-block';
-                rightDiv.innerHTML = `<span>Encrypted Block [${i}]</span><span class="hash-text">[ SELECT ]</span>`;
+                if (pair.rItem) {
+                    rightDiv.innerHTML = `<span>Encrypted Block [${i}]</span><span class="hash-text">[ SELECT ]</span>`;
+                } else {
+                    rightDiv.innerHTML = `<span><span style="color:#e0e0e0;">[ DELETED / EMPTY ]</span></span><span class="hash-text">[ SELECT ]</span>`;
+                }
                 
                 leftDiv.onclick = () => selectBlock('left', i, pHash, leftDiv, arrowDiv);
                 rightDiv.onclick = () => selectBlock('right', i, rHash, rightDiv, arrowDiv);
@@ -419,7 +475,7 @@
                     selLeft.el.classList.add('match-fail');
                     selRight.el.classList.add('match-fail');
                 } 
-                else if (selLeft.hash === selRight.hash) {
+                else if (selLeft.hash === selRight.hash && selLeft.hash !== "0x00000000") {
                     selLeft.el.querySelector('.hash-text').innerText = selLeft.hash + " [ VERIFIED ]";
                     selRight.el.querySelector('.hash-text').innerText = selRight.hash + " [ VERIFIED ]";
                     selLeft.el.classList.add('match-success');
@@ -447,7 +503,7 @@
             }
         }
 
-        // --- THE DEDUCTION BOARD ENGINE ---
+        // --- ALIGNED DEDUCTION BOARD ENGINE ---
         function openDeduction() {
             document.getElementById('deduction-overlay').style.display = 'flex';
             const container = document.getElementById('deduction-list');
@@ -455,36 +511,30 @@
             if (container.children.length === 0) {
                 deductionState = [];
                 
-                let pMoves = programmerState.filter(x => x.id.startsWith('MOVE_'));
-                let pSettings = programmerState.filter(x => !x.id.startsWith('MOVE_'));
-                
-                let moveIndex = 0;
-                
-                robotState.forEach((rItem, index) => {
+                auditPairs.forEach((pair, index) => {
                     deductionState.push({ valid: false, breached: false, broken: false });
-                    
-                    let isMove = rItem.id.startsWith('MOVE_');
-                    
-                    // THE FIX: Always show the programmer's value, or ????? if added by hacker
-                    let displayValue = "?????";
-                    let displayLabel = rItem.label;
-                    
-                    if (isMove) {
-                        displayLabel = `Instruction [${moveIndex}]`;
-                        if (moveIndex < pMoves.length) {
-                            displayValue = pMoves[moveIndex].value;
-                        }
-                        moveIndex++;
-                    } else {
-                        let pItem = pSettings.find(x => x.id === rItem.id);
-                        if (pItem) {
-                            displayValue = pItem.value;
-                            displayLabel = pItem.label;
-                        }
-                    }
                     
                     let div = document.createElement('div');
                     div.className = 'deduction-row';
+                    
+                    let displayLabel = "";
+                    let displayValue = "";
+
+                    if (pair.isMove) {
+                        if (pair.pItem && pair.rItem) {
+                            displayLabel = pair.pItem.label;
+                            displayValue = pair.pItem.value;
+                        } else if (pair.pItem) {
+                            displayLabel = pair.pItem.label + " [DELETED]";
+                            displayValue = pair.pItem.value;
+                        } else if (pair.rItem) {
+                            displayLabel = "Inserted Code";
+                            displayValue = "?????";
+                        }
+                    } else {
+                        displayLabel = pair.pItem.label;
+                        displayValue = pair.pItem.value;
+                    }
                     
                     let html = `<div class="deduction-label" style="width: 30%;">${displayLabel}<br><span style="font-size: 0.8em; color: #888;">${displayValue}</span></div>`;
                     
@@ -492,7 +542,8 @@
                         <button class="btn-deduct" id="btn-val-${index}" onclick="toggleDeduct(${index}, 'valid')">VALID</button>
                         <button class="btn-deduct" id="btn-bre-${index}" onclick="toggleDeduct(${index}, 'breached')">BREACHED</button>`;
                     
-                    if (isMove) {
+                    // Only display the BROKEN toggle if the motor actually existed in robot memory to execute!
+                    if (pair.isMove && pair.rItem) {
                         html += `<button class="btn-deduct" id="btn-bro-${index}" onclick="toggleDeduct(${index}, 'broken')">BROKEN</button>`;
                     } else {
                         html += `<div style="flex: 1; border: 1px dashed transparent;"></div>`; 
@@ -541,14 +592,9 @@
 
         function submitDeduction() {
             let errors = [];
-            let pMoves = programmerState.filter(x => x.id.startsWith('MOVE_'));
-            let pSettings = programmerState.filter(x => !x.id.startsWith('MOVE_'));
             
-            let moveIndex = 0;
-            
-            for (let i = 0; i < robotState.length; i++) {
-                let rItem = robotState[i];
-                let isMove = rItem.id.startsWith('MOVE_');
+            for (let i = 0; i < auditPairs.length; i++) {
+                let pair = auditPairs[i];
                 let state = deductionState[i];
                 
                 if (!state.valid && !state.breached && !state.broken) {
@@ -558,14 +604,24 @@
                 
                 let trueBreached = false;
                 let trueBroken = false;
-                let label = isMove ? `Instruction [${moveIndex}]` : rItem.label;
+                let label = "";
                 
-                if (isMove) {
-                    trueBreached = (moveIndex >= pMoves.length || rItem.value !== pMoves[moveIndex].value);
-                    trueBroken = (window.runtimeFailures && window.runtimeFailures[moveIndex] === true);
+                if (pair.isMove) {
+                    label = pair.pItem ? pair.pItem.label : "Inserted Code";
+                    
+                    if (pair.pItem && pair.rItem) {
+                        trueBreached = false; // LCS guarantees these are identical if paired
+                    } else {
+                        trueBreached = true;
+                    }
+
+                    if (pair.rItem) {
+                        let rIndex = robotState.indexOf(pair.rItem);
+                        trueBroken = (window.runtimeFailures && window.runtimeFailures[rIndex] === true);
+                    }
                 } else {
-                    let pItem = pSettings.find(x => x.id === rItem.id);
-                    trueBreached = (pItem.value !== rItem.value);
+                    label = pair.pItem.label;
+                    trueBreached = (pair.pItem.value !== pair.rItem.value);
                 }
                 
                 let trueValid = !trueBreached && !trueBroken;
@@ -573,14 +629,12 @@
                 if (state.breached !== trueBreached) {
                     errors.push(`[${label}] Breach status was incorrect. (Was actually ${trueBreached ? 'HACKED' : 'SAFE'})`);
                 }
-                if (isMove && state.broken !== trueBroken) {
+                if (pair.isMove && pair.rItem && state.broken !== trueBroken) {
                     errors.push(`[${label}] Motor status was incorrect. (Was actually ${trueBroken ? 'FAILED' : 'WORKING'})`);
                 }
                 if (state.valid !== trueValid && state.breached === trueBreached && state.broken === trueBroken) {
                     errors.push(`[${label}] should have been marked VALID.`);
                 }
-                
-                if (isMove) moveIndex++;
             }
             
             closeDeduction();
@@ -870,8 +924,8 @@
         }
     </script>
 
-    <script src="bluetooth.js?v=19.0"></script>
-    <script type="py" src="app.py?v=19.0"></script>
+    <script src="bluetooth.js?v=20.0"></script>
+    <script type="py" src="app.py?v=20.0"></script>
 
 </body>
 </html>
