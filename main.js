@@ -8,14 +8,38 @@ const chars = '01'.split('');
 const fontSize = 16;
 const columns = mCanvas.width / fontSize;
 const drops = [];
-for (let x = 0; x < columns; x++) drops[x] = Math.random() * mCanvas.height;
+
+// Initialize drops randomly across the Y axis
+for (let x = 0; x < columns; x++) {
+    drops[x] = Math.floor(Math.random() * (mCanvas.height / fontSize));
+}
 
 let matrixIntervalId;
+
+// THE FIX: Transparency is set to 0.15 globally, and speed is dropped to 120ms
 window.matrixSettings = {
-    color: 'rgba(0, 255, 65, 0.25)', 
-    fade: 'rgba(13, 13, 18, 0.08)',
-    speed: 50
+    color: 'rgba(0, 255, 65, 0.15)', 
+    fade: 'rgba(13, 13, 18, 0.05)',
+    speed: 120 
 };
+
+// THE FIX: Simulate 100 frames instantly so the screen starts completely full of rain!
+mCtx.fillStyle = '#0d0d12';
+mCtx.fillRect(0, 0, mCanvas.width, mCanvas.height);
+for(let i = 0; i < 100; i++) {
+    mCtx.fillStyle = window.matrixSettings.fade;
+    mCtx.fillRect(0, 0, mCanvas.width, mCanvas.height);
+    mCtx.fillStyle = window.matrixSettings.color;
+    mCtx.font = fontSize + 'px monospace';
+    for (let j = 0; j < drops.length; j++) {
+        const text = chars[Math.floor(Math.random() * chars.length)];
+        mCtx.fillText(text, j * fontSize, drops[j] * fontSize);
+        if (drops[j] * fontSize > mCanvas.height && Math.random() > 0.975) {
+            drops[j] = 0;
+        }
+        drops[j]++;
+    }
+}
 
 function drawMatrix() {
     mCtx.fillStyle = window.matrixSettings.fade;
@@ -37,7 +61,7 @@ function applyMatrixSettings() {
     if (matrixIntervalId) clearInterval(matrixIntervalId);
     matrixIntervalId = setInterval(drawMatrix, window.matrixSettings.speed);
 }
-applyMatrixSettings(); // Initialize
+applyMatrixSettings();
 window.addEventListener('resize', () => { mCanvas.width = window.innerWidth; mCanvas.height = window.innerHeight; });
 
 
@@ -78,10 +102,8 @@ window.goToPhase2 = function() {
     document.getElementById('panel-sequence').style.borderTopColor = 'var(--neon-red)';
     document.getElementById('attacker-overlay').style.display = 'flex';
 
-    // The Matrix becomes slow, faint, and red!
-    window.matrixSettings.color = 'rgba(255, 0, 60, 0.1)'; 
-    window.matrixSettings.fade = 'rgba(13, 13, 18, 0.03)'; 
-    window.matrixSettings.speed = 120; 
+    // Matrix becomes Red
+    window.matrixSettings.color = 'rgba(255, 0, 60, 0.15)'; 
     applyMatrixSettings();
 }
 
@@ -145,10 +167,8 @@ window.goToPhase3 = function() {
     document.getElementById('step-builder').style.display = 'none';
     document.getElementById('step-execution').style.display = 'flex';
 
-    // Matrix returns to normal green!
-    window.matrixSettings.color = 'rgba(0, 255, 65, 0.25)';
-    window.matrixSettings.fade = 'rgba(13, 13, 18, 0.08)';
-    window.matrixSettings.speed = 50;
+    // Matrix returns to Green
+    window.matrixSettings.color = 'rgba(0, 255, 65, 0.15)';
     applyMatrixSettings();
 }
 
@@ -293,11 +313,11 @@ window.openDeduction = function() {
             let html = `<div class="deduction-label" style="width: 30%;">${displayLabel}<br><span style="font-size: 0.8em; color: #888;">${displayValue}</span></div>`;
             
             html += `<div class="deduction-group" style="flex: 1; display: flex; gap: 10px;">
-                <button class="btn-deduct" id="btn-val-${index}" onclick="toggleDeduct(${index}, 'valid')">VALID</button>
-                <button class="btn-deduct" id="btn-bre-${index}" onclick="toggleDeduct(${index}, 'breached')">BREACHED</button>`;
+                <button class="btn-deduct" id="btn-val-${index}" onclick="window.toggleDeduct(${index}, 'valid')">VALID</button>
+                <button class="btn-deduct" id="btn-bre-${index}" onclick="window.toggleDeduct(${index}, 'breached')">BREACHED</button>`;
             
             if (isMove && pair.rItem) {
-                html += `<button class="btn-deduct" id="btn-bro-${index}" onclick="toggleDeduct(${index}, 'broken')">BROKEN</button>`;
+                html += `<button class="btn-deduct" id="btn-bro-${index}" onclick="window.toggleDeduct(${index}, 'broken')">BROKEN</button>`;
             } else {
                 html += `<div style="flex: 1; border: 1px dashed transparent;"></div>`; 
             }
