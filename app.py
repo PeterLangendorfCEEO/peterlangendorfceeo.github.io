@@ -206,7 +206,7 @@ async def run_sequence(event):
         except Exception as e:
             print_term(f"Command failed or timed out: {e}", color="red")
 
-        # THE GRAPH FIX: Drops the graph to 0 to separate back-to-back identical moves
+        # THE FIX: Guarantee a half-second flatline between EVERY instruction so the graph separates!
         window.currentMoveLabel = "IDLE"
         if hasattr(window, 'setCurrentTargetSpeeds'): window.setCurrentTargetSpeeds(0, 0)
         await asyncio.sleep(0.5)
