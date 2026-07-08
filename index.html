@@ -297,7 +297,7 @@
     <script>
         let programmerState = [];
         let robotState = [];
-        let deductionState = []; // Holds the user's report progress
+        let deductionState = []; 
         let checksRemaining = 3;
 
         function captureState() {
@@ -338,7 +338,6 @@
         function goToPhase3() {
             robotState = captureState();
             
-            // Clear prior states in case of UI rollback
             deductionState = []; 
             document.getElementById('deduction-list').innerHTML = '';
             
@@ -453,19 +452,41 @@
             document.getElementById('deduction-overlay').style.display = 'flex';
             const container = document.getElementById('deduction-list');
             
-            // Only rebuild the DOM if it's empty, allowing progress to be safely saved!
             if (container.children.length === 0) {
                 deductionState = [];
                 
-                // Maps over the FINAL sequence that executed (robotState)
-                robotState.forEach((item, index) => {
+                let pMoves = programmerState.filter(x => x.id.startsWith('MOVE_'));
+                let pSettings = programmerState.filter(x => !x.id.startsWith('MOVE_'));
+                
+                let moveIndex = 0;
+                
+                robotState.forEach((rItem, index) => {
                     deductionState.push({ valid: false, breached: false, broken: false });
                     
-                    let isMove = item.id.startsWith('MOVE_');
+                    let isMove = rItem.id.startsWith('MOVE_');
+                    
+                    // THE FIX: Always show the programmer's value, or ????? if added by hacker
+                    let displayValue = "?????";
+                    let displayLabel = rItem.label;
+                    
+                    if (isMove) {
+                        displayLabel = `Instruction [${moveIndex}]`;
+                        if (moveIndex < pMoves.length) {
+                            displayValue = pMoves[moveIndex].value;
+                        }
+                        moveIndex++;
+                    } else {
+                        let pItem = pSettings.find(x => x.id === rItem.id);
+                        if (pItem) {
+                            displayValue = pItem.value;
+                            displayLabel = pItem.label;
+                        }
+                    }
+                    
                     let div = document.createElement('div');
                     div.className = 'deduction-row';
                     
-                    let html = `<div class="deduction-label" style="width: 30%;">${isMove ? 'Instruction ['+index+']' : item.label}<br><span style="font-size: 0.8em; color: #888;">${item.value}</span></div>`;
+                    let html = `<div class="deduction-label" style="width: 30%;">${displayLabel}<br><span style="font-size: 0.8em; color: #888;">${displayValue}</span></div>`;
                     
                     html += `<div class="deduction-group" style="flex: 1; display: flex; gap: 10px;">
                         <button class="btn-deduct" id="btn-val-${index}" onclick="toggleDeduct(${index}, 'valid')">VALID</button>
@@ -474,7 +495,7 @@
                     if (isMove) {
                         html += `<button class="btn-deduct" id="btn-bro-${index}" onclick="toggleDeduct(${index}, 'broken')">BROKEN</button>`;
                     } else {
-                        html += `<div style="flex: 1; border: 1px dashed transparent;"></div>`; // Invisible spacer
+                        html += `<div style="flex: 1; border: 1px dashed transparent;"></div>`; 
                     }
                     
                     html += `</div>`;
@@ -491,7 +512,6 @@
         function toggleDeduct(index, type) {
             let state = deductionState[index];
             
-            // VALID is mutually exclusive. Clicking it clears the other errors.
             if (type === 'valid') {
                 if (!state.valid) {
                     state.valid = true;
@@ -501,7 +521,6 @@
                     state.valid = false;
                 }
             } 
-            // BREACHED and BROKEN can be toggled together, but both disable VALID
             else if (type === 'breached') {
                 state.breached = !state.breached;
                 if (state.breached) state.valid = false;
@@ -511,7 +530,6 @@
                 if (state.broken) state.valid = false;
             }
 
-            // Sync visual UI classes
             document.getElementById(`btn-val-${index}`).className = 'btn-deduct' + (state.valid ? ' active-valid' : '');
             document.getElementById(`btn-bre-${index}`).className = 'btn-deduct' + (state.breached ? ' active-breached' : '');
             
@@ -533,7 +551,6 @@
                 let isMove = rItem.id.startsWith('MOVE_');
                 let state = deductionState[i];
                 
-                // Ensure the user actually evaluated the row
                 if (!state.valid && !state.breached && !state.broken) {
                     alert("Please evaluate all instructions and settings before submitting the final report!");
                     return;
@@ -543,9 +560,7 @@
                 let trueBroken = false;
                 let label = isMove ? `Instruction [${moveIndex}]` : rItem.label;
                 
-                // Compare ground truth
                 if (isMove) {
-                    // If the index exceeds original length, it was injected by the attacker!
                     trueBreached = (moveIndex >= pMoves.length || rItem.value !== pMoves[moveIndex].value);
                     trueBroken = (window.runtimeFailures && window.runtimeFailures[moveIndex] === true);
                 } else {
@@ -555,7 +570,6 @@
                 
                 let trueValid = !trueBreached && !trueBroken;
                 
-                // Grade the user's toggles
                 if (state.breached !== trueBreached) {
                     errors.push(`[${label}] Breach status was incorrect. (Was actually ${trueBreached ? 'HACKED' : 'SAFE'})`);
                 }
@@ -856,8 +870,8 @@
         }
     </script>
 
-    <script src="bluetooth.js?v=18.0"></script>
-    <script type="py" src="app.py?v=18.0"></script>
+    <script src="bluetooth.js?v=19.0"></script>
+    <script type="py" src="app.py?v=19.0"></script>
 
 </body>
 </html>
