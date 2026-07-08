@@ -68,7 +68,7 @@ let robotState = [];
 let deductionState = []; 
 let auditPairs = []; 
 let checksRemaining = 3;
-window.currentPhase = 1; // Tracks game state for the Hacker Terminal
+window.currentPhase = 1; 
 
 window.logHackerAction = function(cmd) {
     if (window.currentPhase !== 2) return;
@@ -84,7 +84,6 @@ window.logHackerAction = function(cmd) {
     term.scrollTop = term.scrollHeight;
 }
 
-// Attach Event Listeners to Settings to trigger Hacker Terminal
 const settingsInputs = ['fwd_spd', 'rgt_spd', 'rgt_ang', 'lft_spd', 'lft_ang', 'bck_spd'];
 settingsInputs.forEach(id => {
     const el = document.getElementById(id);
@@ -95,7 +94,6 @@ settingsInputs.forEach(id => {
     }
 });
 
-// Use MutationObserver to securely catch Python adding/removing DOM elements
 let isDraggingMove = false;
 let previousOrder = [];
 const listbox = document.getElementById('move-listbox');
@@ -122,7 +120,6 @@ const observer = new MutationObserver((mutations) => {
 if (listbox) {
     observer.observe(listbox, { childList: true });
 }
-
 
 window.captureState = function() {
     let state = [];
@@ -157,7 +154,6 @@ window.goToPhase2 = function() {
     window.matrixSettings.color = 'rgba(255, 0, 60, 0.15)'; 
     applyMatrixSettings();
 
-    // Officially enter Phase 2 so the Hacker Terminal wakes up
     window.currentPhase = 2;
 }
 
@@ -222,7 +218,9 @@ window.goToPhase3 = function() {
     document.getElementById('step-builder').style.display = 'none';
     document.getElementById('step-execution').style.display = 'flex';
 
-    window.matrixSettings.color = 'rgba(0, 255, 65, 0.15)';
+    window.matrixSettings.color = 'rgba(0, 255, 65, 0.25)';
+    window.matrixSettings.fade = 'rgba(13, 13, 18, 0.08)';
+    window.matrixSettings.speed = 50;
     applyMatrixSettings();
 }
 
@@ -722,34 +720,36 @@ window.drawSensorGraph = function() {
 }
 
 // --- DRAG AND DROP UX ---
-const listbox = document.getElementById('move-listbox');
-document.addEventListener('click', (e) => { if (!e.target.closest('#move-listbox') && !e.target.closest('#btn-remove')) { document.querySelectorAll('.list-item.selected').forEach(el => el.classList.remove('selected')); } });
-listbox.addEventListener('click', (e) => { if (e.target.classList.contains('list-item')) { document.querySelectorAll('.list-item.selected').forEach(el => el.classList.remove('selected')); e.target.classList.add('selected'); } });
-listbox.addEventListener('dragstart', (e) => { 
-    if(e.target.classList.contains('list-item')) { 
-        isDraggingMove = true;
-        previousOrder = Array.from(listbox.children).map(c => c.innerText);
-        setTimeout(() => e.target.classList.add('dragging'), 0); 
-    } 
-});
-listbox.addEventListener('dragend', (e) => { 
-    if(e.target.classList.contains('list-item')) { 
-        e.target.classList.remove('dragging'); 
-        isDraggingMove = false;
-        if (window.currentPhase === 2) {
-            const currentOrder = Array.from(listbox.children).map(c => c.innerText);
-            if (JSON.stringify(previousOrder) !== JSON.stringify(currentOrder)) {
-                window.logHackerAction(`MEM_SHIFT --ptr_realloc=SUCCESS`);
+// (We removed the duplicate const listbox declaration here to prevent the SyntaxError!)
+if (listbox) {
+    document.addEventListener('click', (e) => { if (!e.target.closest('#move-listbox') && !e.target.closest('#btn-remove')) { document.querySelectorAll('.list-item.selected').forEach(el => el.classList.remove('selected')); } });
+    listbox.addEventListener('click', (e) => { if (e.target.classList.contains('list-item')) { document.querySelectorAll('.list-item.selected').forEach(el => el.classList.remove('selected')); e.target.classList.add('selected'); } });
+    listbox.addEventListener('dragstart', (e) => { 
+        if(e.target.classList.contains('list-item')) { 
+            isDraggingMove = true;
+            previousOrder = Array.from(listbox.children).map(c => c.innerText);
+            setTimeout(() => e.target.classList.add('dragging'), 0); 
+        } 
+    });
+    listbox.addEventListener('dragend', (e) => { 
+        if(e.target.classList.contains('list-item')) { 
+            e.target.classList.remove('dragging'); 
+            isDraggingMove = false;
+            if (window.currentPhase === 2) {
+                const currentOrder = Array.from(listbox.children).map(c => c.innerText);
+                if (JSON.stringify(previousOrder) !== JSON.stringify(currentOrder)) {
+                    window.logHackerAction(`MEM_SHIFT --ptr_realloc=SUCCESS`);
+                }
             }
-        }
-    } 
-});
-listbox.addEventListener('dragover', (e) => {
-    e.preventDefault();
-    const afterElement = getDragAfterElement(listbox, e.clientY);
-    const currentDraggable = document.querySelector('.dragging');
-    if (currentDraggable) { if (afterElement == null) { listbox.appendChild(currentDraggable); } else { listbox.insertBefore(currentDraggable, afterElement); } }
-});
+        } 
+    });
+    listbox.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        const afterElement = getDragAfterElement(listbox, e.clientY);
+        const currentDraggable = document.querySelector('.dragging');
+        if (currentDraggable) { if (afterElement == null) { listbox.appendChild(currentDraggable); } else { listbox.insertBefore(currentDraggable, afterElement); } }
+    });
+}
 function getDragAfterElement(container, y) {
     const draggableElements = [...container.querySelectorAll('.list-item:not(.dragging)')];
     return draggableElements.reduce((closest, child) => {
