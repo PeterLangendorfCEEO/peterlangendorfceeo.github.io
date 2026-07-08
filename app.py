@@ -93,6 +93,7 @@ async def run_sequence(event):
     document.querySelector("#btn-begin").setAttribute("disabled", "true")
     if document.querySelector("#btn-diagnostics"): document.querySelector("#btn-diagnostics").setAttribute("disabled", "true")
     if document.querySelector("#btn-sensors"): document.querySelector("#btn-sensors").setAttribute("disabled", "true")
+    if document.querySelector("#btn-deduction"): document.querySelector("#btn-deduction").setAttribute("disabled", "true")
 
     listbox = document.querySelector("#move-listbox")
     move_set = [listbox.children.item(i).innerText.lower() for i in range(listbox.children.length)]
@@ -106,6 +107,16 @@ async def run_sequence(event):
         "left_angle": document.querySelector("#lft_ang").value,
     }
 
+    # PRE-CALCULATE THE MOTOR FAILURES FOR THE UI DEDUCTION BOARD
+    failures_list = []
+    for _ in move_set:
+        failed = False
+        if random.randint(1, 100) <= ENGINE_FAILURE_CHANCE:
+            failed = True
+        failures_list.append(failed)
+    
+    window.runtimeFailures = to_js(failures_list)
+
     print_term("Executing sequence...", color="#00ffcc")
     
     if hasattr(window, 'startTelemetry'):
@@ -117,12 +128,12 @@ async def run_sequence(event):
     LEFT = window.legoBluetooth.MOTOR_BITS_LEFT
     RIGHT = window.legoBluetooth.MOTOR_BITS_RIGHT
 
-    for move in move_set:
+    for idx, move in enumerate(move_set):
         left_failed = False
         right_failed = False
         window.currentMoveLabel = move.upper()
 
-        if random.randint(1, 100) <= ENGINE_FAILURE_CHANCE:
+        if failures_list[idx]:
             if random.randint(1, 2) == 1: left_failed = True
             else: right_failed = True
 
@@ -132,7 +143,6 @@ async def run_sequence(event):
                 if move == "forward":
                     speed = int(settings.get("forward_speed", 100))
                     
-                    # THE FIX: Python securely dictates if the motor should be 0 due to engine failure
                     l_tgt = speed if not left_failed else 0
                     r_tgt = speed if not right_failed else 0
                     if hasattr(window, 'setCurrentTargetSpeeds'): window.setCurrentTargetSpeeds(l_tgt, r_tgt)
@@ -206,6 +216,7 @@ async def run_sequence(event):
     
     if document.querySelector("#btn-diagnostics"): document.querySelector("#btn-diagnostics").removeAttribute("disabled")
     if document.querySelector("#btn-sensors"): document.querySelector("#btn-sensors").removeAttribute("disabled")
+    if document.querySelector("#btn-deduction"): document.querySelector("#btn-deduction").removeAttribute("disabled")
 
 
 try:
