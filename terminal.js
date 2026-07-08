@@ -48,7 +48,13 @@ var isDraggingMove = false;
 var previousOrder = [];     
 const listbox = document.getElementById('move-listbox');
 
+// THE FIX: Sync settings immediately if listbox loads, and on every mutation
+if (window.syncSettings) window.syncSettings();
+
 const observer = new MutationObserver((mutations) => {
+    
+    if (window.syncSettings) window.syncSettings(); // Updates dropdown locks!
+    
     if (currentPhase !== 2) return;
     if (isDraggingMove) return; 
 

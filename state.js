@@ -6,6 +6,23 @@ var auditPairs = [];
 var checksRemaining = 3;
 var currentPhase = 1; 
 
+window.animTimeouts = [];
+
+window.setAnimTimeout = function(callback, ms) {
+    let id = setTimeout(callback, ms);
+    window.animTimeouts.push(id);
+    return id;
+};
+
+window.clearAnimTimeouts = function() {
+    window.animTimeouts.forEach(clearTimeout);
+    window.animTimeouts = [];
+};
+
+window.p1_flicker = null;
+window.p1_spray = null;
+window.p2_flicker = null;
+
 window.doTransition = function(callback, event) {
     const wipe = document.getElementById('transition-wipe');
     
@@ -37,34 +54,98 @@ window.captureState = function() {
     for(let i=0; i<moves.length; i++) {
         state.push({
             id: 'MOVE_' + i,
-            moveId: moves[i].getAttribute('data-move-id'), // stable identity, survives drag reordering
+            moveId: moves[i].getAttribute('data-move-id'),
             label: `Instruction [${i}]`,
             value: moves[i].innerText.trim().toUpperCase()
         });
     }
     const settingsMap = [
-        { id: 'FWD_SPD', el: 'fwd_spd', label: 'Forward Speed' }, { id: 'BCK_SPD', el: 'bck_spd', label: 'Backward Speed' },
-        { id: 'RGT_SPD', el: 'rgt_spd', label: 'Right Speed' }, { id: 'LFT_SPD', el: 'lft_spd', label: 'Left Speed' },
-        { id: 'RGT_ANG', el: 'rgt_ang', label: 'Right Angle' }, { id: 'LFT_ANG', el: 'lft_ang', label: 'Left Angle' }
+        { id: 'FWD_SPD', el: 'fwd_spd', label: 'Forward Speed' }, 
+        { id: 'BCK_SPD', el: 'bck_spd', label: 'Backward Speed' },
+        { id: 'RGT_SPD', el: 'rgt_spd', label: 'Right Speed' }, 
+        { id: 'LFT_SPD', el: 'lft_spd', label: 'Left Speed' },
+        { id: 'RGT_ANG', el: 'rgt_ang', label: 'Right Angle' }, 
+        { id: 'LFT_ANG', el: 'lft_ang', label: 'Left Angle' }
     ];
-    settingsMap.forEach(s => { state.push({ id: s.id, label: s.label, value: document.getElementById(s.el).value }); });
+    settingsMap.forEach(s => { 
+        let el = document.getElementById(s.el);
+        if (el) { state.push({ id: s.id, label: s.label, value: el.value }); }
+    });
     return state;
 }
 
-window.goToPhase2 = function(event) {
+// THE FIX: Settings auto-disable and snap to default values when removed from the sequence
+window.syncSettings = function() {
+    const listbox = document.getElementById('move-listbox');
+    if (!listbox) return;
     
+    const moves = Array.from(listbox.children).map(c => c.innerText.trim().toLowerCase());
+    const hasFwd = moves.includes('forward');
+    const hasBck = moves.includes('back');
+    const hasLft = moves.includes('left');
+    const hasRgt = moves.includes('right');
+
+    const fwdSpd = document.getElementById('fwd_spd');
+    if (fwdSpd) { fwdSpd.disabled = !hasFwd; if (!hasFwd) fwdSpd.value = "100"; }
+
+    const bckSpd = document.getElementById('bck_spd');
+    if (bckSpd) { bckSpd.disabled = !hasBck; if (!hasBck) bckSpd.value = "100"; }
+
+    const lftSpd = document.getElementById('lft_spd');
+    if (lftSpd) { lftSpd.disabled = !hasLft; if (!hasLft) lftSpd.value = "10"; }
+
+    const lftAng = document.getElementById('lft_ang');
+    if (lftAng) { lftAng.disabled = !hasLft; if (!hasLft) lftAng.value = "-90"; }
+
+    const rgtSpd = document.getElementById('rgt_spd');
+    if (rgtSpd) { rgtSpd.disabled = !hasRgt; if (!hasRgt) rgtSpd.value = "10"; }
+
+    const rgtAng = document.getElementById('rgt_ang');
+    if (rgtAng) { rgtAng.disabled = !hasRgt; if (!hasRgt) rgtAng.value = "90"; }
+};
+
+window.skipToPhase2 = function() {
+    window.clearAnimTimeouts();
+    if (window.p1_flicker) clearInterval(window.p1_flicker);
+    if (window.p1_spray) clearInterval(window.p1_spray);
+
+    document.getElementById('hijack-overlay').style.display = 'none';
+    document.body.classList.remove('exploding');
+    
+    const wipe = document.getElementById('transition-wipe');
+    wipe.style.transition = 'none';
+    wipe.classList.remove('wipe-in');
+    
+    document.getElementById('step-builder').style.display = 'none';
+    
+    programmerState = window.captureState();
+    currentPhase = 2;
+    document.getElementById('phase2-container').style.display = 'flex';
+    document.getElementById('attacker-overlay').style.display = 'flex';
+    document.getElementById('phase2-list-container').appendChild(document.getElementById('shared-editor'));
+    document.body.classList.add('hacker-mode');
+    
+    window.syncSettings(); 
+    
+    if (window.clearMatrix) window.clearMatrix('#120004');
+    window.matrixSettings.color = 'rgba(255, 0, 60, 0.7)'; 
+    window.matrixSettings.fade = 'rgba(18, 0, 4, 0.05)'; 
+    if (window.preRenderMatrix) window.preRenderMatrix(); 
+    if (window.applyMatrixSettings) window.applyMatrixSettings();
+};
+
+window.goToPhase2 = function(event) {
     const wipe = document.getElementById('transition-wipe');
     if (event) {
         document.documentElement.style.setProperty('--wipe-x', event.clientX + 'px');
         document.documentElement.style.setProperty('--wipe-y', event.clientY + 'px');
     }
     
-    // 1. Initial explosion to black
     document.body.classList.add('exploding'); 
     wipe.style.transition = 'transform 0.6s cubic-bezier(0.9, 0.03, 0.05, 0.9)';
     wipe.classList.add('wipe-in');
     
-    setTimeout(() => {
+    window.setAnimTimeout(() => {
         document.body.classList.remove('exploding'); 
         
         document.getElementById('step-builder').style.display = 'none';
@@ -76,13 +157,11 @@ window.goToPhase2 = function(event) {
         
         const packet = document.getElementById('h-packet');
         const hacker = document.getElementById('h-hacker');
-        const stream = document.getElementById('h-stream');
 
-        // Reset Animation positions
         packet.style.transition = 'none';
-        packet.style.left = '-10%';
+        packet.style.left = '50px';
         packet.style.transform = 'translate(-50%, -50%) scale(0)';
-        packet.style.filter = 'none'; // Clears any old red filters
+        packet.style.filter = 'none'; 
         
         hacker.style.transition = 'none';
         hacker.style.top = '-150px';
@@ -91,9 +170,8 @@ window.goToPhase2 = function(event) {
         wipe.style.transition = 'none';
         wipe.classList.remove('wipe-in');
         
-        // --- START BINARY FLICKER ---
         const binaryRows = document.querySelectorAll('.binary-row');
-        const flickerInterval = setInterval(() => {
+        window.p1_flicker = setInterval(() => {
             binaryRows.forEach(row => {
                 let charArray = row.innerText.split('');
                 for(let k=0; k<2; k++) {
@@ -105,27 +183,23 @@ window.goToPhase2 = function(event) {
             });
         }, 150);
 
-        setTimeout(() => {
-            // A. Slow Glide (3.0 seconds total!)
+        window.setAnimTimeout(() => {
             packet.style.transition = 'left 3.0s linear, transform 0.3s cubic-bezier(0.1, 0.8, 0.3, 1)';
-            packet.style.left = '45%'; 
+            packet.style.left = '50%'; 
             packet.style.transform = 'translate(-50%, -50%) scale(1)';
 
-            // B. Hacker Terminal Drops In (Start at 2.7s, drops for 0.3s -> Hits at 3.0s!)
-            setTimeout(() => {
+            window.setAnimTimeout(() => {
                 hacker.style.transition = 'top 0.3s cubic-bezier(0.8, 0, 0.2, 1), opacity 0.3s';
                 hacker.style.top = '120px';
                 hacker.style.opacity = '1';
 
-                // C. Impact!
-                setTimeout(() => {
+                window.setAnimTimeout(() => {
                     document.body.classList.add('exploding'); 
                     
-                    // THE FIX: Uses CSS filter to instantly corrupt the custom image to Neon Red!
                     packet.style.filter = 'drop-shadow(0 0 20px #ff003c) sepia(1) hue-rotate(-50deg) saturate(5)';
                     
                     let sprayCount = 0;
-                    const sprayInterval = setInterval(() => {
+                    window.p1_spray = setInterval(() => {
                         for(let i=0; i<3; i++) {
                             let p = document.createElement('div');
                             p.className = 'h-particle';
@@ -136,33 +210,31 @@ window.goToPhase2 = function(event) {
                             
                             let angle = Math.random() * Math.PI * 2;
                             let distance = 50 + Math.random() * 200;
-                            let endX = 350 + Math.cos(angle) * distance;
-                            let endY = 170 + Math.sin(angle) * distance;
+                            let dx = Math.cos(angle) * distance;
+                            let dy = Math.sin(angle) * distance;
                             
                             p.style.transition = 'all 0.6s cubic-bezier(0.1, 0.9, 0.2, 1)';
                             scene.appendChild(p);
                             
                             void p.offsetWidth; 
                             
-                            p.style.transform = `translate(${endX - 350}px, ${endY - 170}px) scale(1.5)`;
+                            p.style.transform = `translate(${dx}px, ${dy}px) scale(1.5)`;
                             p.style.opacity = '0';
                             
-                            setTimeout(() => p.remove(), 600);
+                            window.setAnimTimeout(() => p.remove(), 600);
                         }
                         sprayCount++;
-                        if(sprayCount > 40) clearInterval(sprayInterval); 
+                        if(sprayCount > 40) clearInterval(window.p1_spray); 
                     }, 25);
 
-                    setTimeout(() => { document.body.classList.remove('exploding'); }, 400);
+                    window.setAnimTimeout(() => { document.body.classList.remove('exploding'); }, 400);
 
-                    // D. End Animation
-                    setTimeout(() => {
-                        clearInterval(flickerInterval); // Stop the binary text loop
+                    window.setAnimTimeout(() => {
+                        clearInterval(window.p1_flicker); 
                         scene.style.transition = 'opacity 0.5s';
                         scene.style.opacity = '0';
                         
-                        // E. Reverse explosion
-                        setTimeout(() => {
+                        window.setAnimTimeout(() => {
                             wipe.style.transition = 'none';
                             document.documentElement.style.setProperty('--wipe-x', '50%');
                             document.documentElement.style.setProperty('--wipe-y', '50%');
@@ -175,6 +247,8 @@ window.goToPhase2 = function(event) {
                             document.getElementById('phase2-list-container').appendChild(document.getElementById('shared-editor'));
                             document.body.classList.add('hacker-mode');
                             
+                            window.syncSettings(); 
+                            
                             if (window.clearMatrix) window.clearMatrix('#120004');
                             window.matrixSettings.color = 'rgba(255, 0, 60, 0.7)'; 
                             window.matrixSettings.fade = 'rgba(18, 0, 4, 0.05)'; 
@@ -183,7 +257,7 @@ window.goToPhase2 = function(event) {
 
                             overlay.style.display = 'none';
                             
-                            setTimeout(() => { 
+                            window.setAnimTimeout(() => { 
                                 wipe.style.transition = 'transform 0.6s cubic-bezier(0.9, 0.03, 0.05, 0.9)';
                                 wipe.classList.remove('wipe-in'); 
                             }, 50);
@@ -192,10 +266,136 @@ window.goToPhase2 = function(event) {
                     }, 1200); 
 
                 }, 300); 
-            }, 2700); // 2.7s + 0.3s drop = 3.0s impact!
+            }, 2700); 
         }, 500); 
         
     }, 600); 
+}
+
+window.skipToPhase3 = function() {
+    window.clearAnimTimeouts();
+    if (window.p2_flicker) clearInterval(window.p2_flicker);
+    
+    document.getElementById('deploy-overlay').style.display = 'none';
+    document.getElementById('phase2-container').style.display = 'none';
+    document.body.classList.remove('exploding');
+    
+    const wipe = document.getElementById('transition-wipe');
+    wipe.style.transition = 'none';
+    wipe.classList.remove('wipe-in');
+    
+    currentPhase = 3; 
+    robotState = window.captureState(); 
+    deductionState = []; 
+    document.getElementById('deduction-list').innerHTML = '';
+    
+    buildAlignment(); 
+    window.renderChecksumLists();
+    
+    document.getElementById('step-execution').style.display = 'flex';
+    document.body.classList.remove('hacker-mode');
+    
+    if (window.clearMatrix) window.clearMatrix('#0d0d12');
+    window.matrixSettings.color = 'rgba(0, 255, 65, 0.4)'; 
+    window.matrixSettings.fade = 'rgba(13, 13, 18, 0.08)';
+    if (window.preRenderMatrix) window.preRenderMatrix(); 
+    if (window.applyMatrixSettings) window.applyMatrixSettings();
+};
+
+window.goToPhase3 = function(event) {
+    const wipe = document.getElementById('transition-wipe');
+    if (event) {
+        document.documentElement.style.setProperty('--wipe-x', event.clientX + 'px');
+        document.documentElement.style.setProperty('--wipe-y', event.clientY + 'px');
+    }
+    
+    document.body.classList.add('exploding'); 
+    wipe.style.transition = 'transform 0.6s cubic-bezier(0.9, 0.03, 0.05, 0.9)';
+    wipe.classList.add('wipe-in');
+    
+    window.setAnimTimeout(() => {
+        document.body.classList.remove('exploding'); 
+        document.getElementById('phase2-container').style.display = 'none';
+        
+        const overlay = document.getElementById('deploy-overlay');
+        const scene = document.getElementById('deploy-scene');
+        overlay.style.display = 'flex';
+        scene.style.opacity = '1';
+        
+        const packet = document.getElementById('d-packet');
+        const bot = document.getElementById('d-bot');
+        
+        packet.style.transition = 'none';
+        packet.style.left = '50px';
+        packet.style.transform = 'translate(-50%, -50%) scale(0)';
+        bot.style.filter = 'none';
+        
+        wipe.classList.remove('wipe-in');
+        
+        const binaryRows = document.querySelectorAll('#d-stream .binary-row');
+        window.p2_flicker = setInterval(() => {
+            binaryRows.forEach(row => {
+                let chars = row.innerText.split('');
+                for(let k=0; k<5; k++) {
+                    let idx = Math.floor(Math.random() * chars.length);
+                    chars[idx] = chars[idx] === '0' ? '1' : '0';
+                }
+                row.innerText = chars.join('');
+            });
+        }, 100);
+
+        window.setAnimTimeout(() => {
+            packet.style.transition = 'left 1.5s cubic-bezier(0.4, 0, 1, 1), transform 0.2s ease-out';
+            packet.style.left = '95%'; 
+            packet.style.transform = 'translate(-50%, -50%) scale(1)';
+
+            window.setAnimTimeout(() => {
+                document.body.classList.add('exploding');
+                packet.style.opacity = '0'; 
+                bot.style.filter = 'drop-shadow(0 0 20px #ff003c) drop-shadow(0 0 30px #ff003c)';
+                
+                window.setAnimTimeout(() => { document.body.classList.remove('exploding'); }, 400);
+
+                window.setAnimTimeout(() => {
+                    scene.style.transition = 'opacity 0.5s';
+                    scene.style.opacity = '0';
+                    
+                    window.setAnimTimeout(() => {
+                        wipe.style.transition = 'none';
+                        document.documentElement.style.setProperty('--wipe-x', '50%');
+                        document.documentElement.style.setProperty('--wipe-y', '50%');
+                        wipe.classList.add('wipe-in');
+                        
+                        currentPhase = 3; 
+                        robotState = window.captureState(); 
+                        deductionState = []; 
+                        document.getElementById('deduction-list').innerHTML = '';
+                        
+                        buildAlignment(); 
+                        window.renderChecksumLists();
+                        
+                        document.getElementById('step-execution').style.display = 'flex';
+                        document.body.classList.remove('hacker-mode');
+                        
+                        if (window.clearMatrix) window.clearMatrix('#0d0d12');
+                        window.matrixSettings.color = 'rgba(0, 255, 65, 0.4)'; 
+                        window.matrixSettings.fade = 'rgba(13, 13, 18, 0.08)';
+                        if (window.preRenderMatrix) window.preRenderMatrix(); 
+                        if (window.applyMatrixSettings) window.applyMatrixSettings();
+                        
+                        overlay.style.display = 'none';
+                        clearInterval(window.p2_flicker);
+                        
+                        window.setAnimTimeout(() => { 
+                            wipe.style.transition = 'transform 0.6s cubic-bezier(0.9, 0.03, 0.05, 0.9)';
+                            wipe.classList.remove('wipe-in'); 
+                        }, 50);
+
+                    }, 1000);
+                }, 800); 
+            }, 1500); 
+        }, 300);
+    }, 600);
 }
 
 window.unblurAttacker = function() { document.getElementById('attacker-overlay').style.display = 'none'; }
@@ -208,11 +408,6 @@ function buildAlignment() {
 
     auditPairs = [];
 
-    // --- Identity-based diff ---
-    // Match moves by their stable moveId, NOT by value. Matching by value
-    // breaks down the moment two moves share a value (e.g. two "forward"s),
-    // since a value-only LCS can't tell which "forward" is which and
-    // misaligns everything downstream. Identity fixes that.
     let matrix = Array(pMoves.length + 1).fill().map(() => Array(rMoves.length + 1).fill(0));
     for (let i = 1; i <= pMoves.length; i++) {
         for (let j = 1; j <= rMoves.length; j++) {
@@ -222,7 +417,7 @@ function buildAlignment() {
     }
 
     let i = pMoves.length, j = rMoves.length;
-    let rawDiff = []; // ordered list of {type:'keep'|'del'|'ins', ...}
+    let rawDiff = []; 
     while (i > 0 && j > 0) {
         if (pMoves[i-1].moveId === rMoves[j-1].moveId) {
             rawDiff.unshift({ type: 'keep', pItem: pMoves[i-1], rItem: rMoves[j-1] });
@@ -238,33 +433,11 @@ function buildAlignment() {
     while (j > 0) { rawDiff.unshift({ type: 'ins', rItem: rMoves[j-1] }); j--; }
     while (i > 0) { rawDiff.unshift({ type: 'del', pItem: pMoves[i-1] }); i--; }
 
-    // --- Second pass: link replacements ---
-    // A "replace" (hacker adds a move, drags it into position, deletes the
-    // original) shows up in rawDiff as a run of dels and inserts sitting
-    // between two kept moves. Instead of rendering that as unrelated
-    // "deleted" and "?????" rows, pair them up into single linked rows so
-    // comparing the two sides in the audit reveals what really happened.
     let moveAuditPairs = [];
     let runDeletes = [];
     let runInserts = [];
 
     function flushRun() {
-        // Within this run, first link any delete to an insert that shares
-        // the SAME VALUE, before falling back to positional pairing.
-        //
-        // Why: identity (moveId) only tells us "is this literally the same
-        // instruction instance". It does NOT tell us "did anything actually
-        // change". If a hacker deletes a "forward" and later re-adds a
-        // brand-new "forward" (a fresh moveId -- ids are never reused),
-        // identity alone sees an unrelated delete plus an unrelated insert.
-        // Pairing those by pure encounter order could link the untouched
-        // "forward" against some unrelated insert (e.g. "left"), while the
-        // real re-added "forward" is left showing as a foreign
-        // "????? -> FORWARD" insertion -- both then read as breached even
-        // though nothing about that move actually changed. Preferring a
-        // same-value match first means a delete+re-add of an identical
-        // value nets out as unchanged, and only genuine value changes fall
-        // through to the positional "real replacement" pairing below.
         let usedInsert = new Array(runInserts.length).fill(false);
         let usedDelete = new Array(runDeletes.length).fill(false);
 
@@ -282,14 +455,11 @@ function buildAlignment() {
         let remainingDeletes = runDeletes.filter((_, d) => !usedDelete[d]);
         let remainingInserts = runInserts.filter((_, k) => !usedInsert[k]);
 
-        // Real replacements: whatever's left genuinely changed value.
         const pairCount = Math.min(remainingDeletes.length, remainingInserts.length);
         for (let k = 0; k < pairCount; k++) {
             moveAuditPairs.push({ pItem: remainingDeletes[k], rItem: remainingInserts[k], isMove: true });
         }
-        // Pure deletions left over: keep the slot, but the "robot memory"
-        // side is a blank stand-in (not a real executed move) so comparing
-        // it to the original will simply read as wrong/breached.
+        
         for (let k = pairCount; k < remainingDeletes.length; k++) {
             const d = remainingDeletes[k];
             moveAuditPairs.push({
@@ -298,8 +468,7 @@ function buildAlignment() {
                 isMove: true
             });
         }
-        // Pure insertions left over: no original ever existed here, so the
-        // programmer side is a genuine "?????" placeholder.
+        
         for (let k = pairCount; k < remainingInserts.length; k++) {
             moveAuditPairs.push({ pItem: null, rItem: remainingInserts[k], isMove: true });
         }
@@ -320,27 +489,4 @@ function buildAlignment() {
 
     auditPairs.push(...moveAuditPairs);
     for(let s=0; s<pSettings.length; s++) { auditPairs.push({ pItem: pSettings[s], rItem: rSettings[s], isMove: false }); }
-}
-
-window.goToPhase3 = function(event) {
-    window.doTransition(() => {
-        currentPhase = 3;
-        robotState = window.captureState();
-        deductionState = []; 
-        document.getElementById('deduction-list').innerHTML = '';
-        
-        buildAlignment(); 
-        window.renderChecksumLists();
-        
-        document.getElementById('phase2-container').style.display = 'none';
-        document.getElementById('step-execution').style.display = 'flex';
-        
-        document.body.classList.remove('hacker-mode');
-
-        if (window.clearMatrix) window.clearMatrix('#0d0d12');
-        window.matrixSettings.color = 'rgba(0, 255, 65, 0.4)'; 
-        window.matrixSettings.fade = 'rgba(13, 13, 18, 0.08)';
-        if (window.preRenderMatrix) window.preRenderMatrix(); 
-        if (window.applyMatrixSettings) window.applyMatrixSettings();
-    }, event);
 }

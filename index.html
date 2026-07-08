@@ -8,7 +8,11 @@
     <link rel="stylesheet" href="https://pyscript.net/releases/2023.11.1/core.css" />
     <script type="module" src="https://pyscript.net/releases/2023.11.1/core.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=32.0">
+    
+    <link rel="stylesheet" href="core.css?v=37.0">
+    <link rel="stylesheet" href="terminal.css?v=37.0">
+    <link rel="stylesheet" href="modals.css?v=37.0">
+    <link rel="stylesheet" href="cinematic.css?v=37.0">
 </head>
 <body>
 
@@ -16,9 +20,10 @@
     <div id="grid-overlay"></div>
     <div id="transition-wipe"></div>
 
-    <div id="hijack-overlay" style="display:none;">
-        <div id="hijack-scene" id="hijack-scene">
-            <div class="hijack-pc">
+    <div id="hijack-overlay" class="cinematic-overlay" style="display:none;">
+        <button class="skip-btn" onclick="window.skipToPhase2()">[ SKIP CUTSCENE >> ]</button>
+        <div id="hijack-scene" class="cinematic-scene">
+            <div class="cinematic-pc">
                 <svg width="100" height="100" viewBox="0 0 16 16" shape-rendering="crispEdges">
                     <rect x="2" y="2" width="12" height="8" fill="#555"/>
                     <rect x="3" y="3" width="10" height="6" fill="#00ff41"/>
@@ -27,15 +32,15 @@
                 </svg>
             </div>
             
-            <div class="hijack-stream" id="h-stream">
+            <div class="cinematic-stream" id="h-stream">
                 <div class="binary-row">01001101 01100001 01110011 01110100 01100101 01110010 01100011 01101000 01001101 01100001</div>
                 <div class="binary-row">01101001 01100101 01100110 00100000 01110011 01110000 01100001 01110010 01101001 01100101</div>
                 <div class="binary-row">01110100 01100001 01101110 00100000 00110001 00110001 00110111 00000000 01110100 01100001</div>
-                
-                <img class="hijack-packet" id="h-packet" src="packet.png" alt="DATA">
             </div>
 
-            <div class="hijack-hacker" id="h-hacker">
+            <img class="cinematic-packet" id="h-packet" src="packet.png" alt="DATA">
+
+            <div class="cinematic-hacker" id="h-hacker">
                 <svg width="120" height="120" viewBox="0 0 16 16" shape-rendering="crispEdges">
                     <rect x="1" y="1" width="14" height="10" fill="#222"/>
                     <rect x="2" y="2" width="12" height="8" fill="#ff003c"/>
@@ -47,7 +52,7 @@
                 </svg>
             </div>
 
-            <div class="hijack-bot">
+            <div class="cinematic-bot">
                 <svg width="100" height="100" viewBox="0 0 16 16" shape-rendering="crispEdges">
                     <rect x="4" y="4" width="8" height="8" fill="#aaa"/>
                     <rect x="5" y="6" width="2" height="2" fill="#00f0ff"/>
@@ -59,7 +64,35 @@
             </div>
         </div>
     </div>
+    
+    <div id="deploy-overlay" class="cinematic-overlay" style="display:none;">
+        <button class="skip-btn" onclick="window.skipToPhase3()">[ SKIP CUTSCENE >> ]</button>
+        <div id="deploy-scene" class="cinematic-scene">
+            <div class="cinematic-pc">
+                <svg width="100" height="100" viewBox="0 0 16 16" shape-rendering="crispEdges">
+                    <rect x="1" y="1" width="14" height="10" fill="#222"/><rect x="2" y="2" width="12" height="8" fill="#ff003c"/>
+                    <rect x="5" y="4" width="2" height="2" fill="#000"/><rect x="9" y="4" width="2" height="2" fill="#000"/>
+                    <rect x="4" y="7" width="8" height="2" fill="#000"/><rect x="3" y="11" width="10" height="2" fill="#111"/>
+                    <rect x="0" y="13" width="16" height="3" fill="#222"/>
+                </svg>
+            </div>
+            
+            <div class="cinematic-stream" id="d-stream">
+                <div class="binary-row red">10110010 11010111 00110101 10001010 11110000 00101101 11001011 01010100 11100011 10101010</div>
+                <div class="binary-row red">11101001 10111100 01101011 11000111 01010101 10011010 11011011 00010101 10111100 01100110</div>
+                <div class="binary-row red">10010101 11010011 00101010 11101101 01110011 10101010 11001100 01011101 11101100 00101010</div>
+                <img class="cinematic-packet" id="d-packet" src="packet.png" alt="DATA" style="filter: drop-shadow(0 0 20px #ff003c) sepia(1) hue-rotate(-50deg) saturate(5);">
+            </div>
 
+            <div class="cinematic-bot" id="d-bot">
+                <svg width="100" height="100" viewBox="0 0 16 16" shape-rendering="crispEdges">
+                    <rect x="4" y="4" width="8" height="8" fill="#aaa"/><rect x="5" y="6" width="2" height="2" fill="#00f0ff"/>
+                    <rect x="9" y="6" width="2" height="2" fill="#00f0ff"/><rect x="7" y="1" width="2" height="3" fill="#888"/>
+                    <rect x="2" y="12" width="4" height="4" fill="#555"/><rect x="10" y="12" width="4" height="4" fill="#555"/>
+                </svg>
+            </div>
+        </div>
+    </div>
 
     <div id="loading-screen">
         <div class="loader-title">[ SYSTEM_BOOT_SEQUENCE ]</div>
@@ -175,12 +208,69 @@
                     <div class="editor-col" style="border-left: 1px dashed #333; padding-left: 20px;">
                         <h4>// MOTOR_CONSTANTS</h4>
                         <div style="flex: 1; overflow-y: auto; padding-right: 10px;">
-                            <div class="setting-row"><span style="width: 140px; text-align: left;">FORWARD_SPEED:</span><input type="number" id="fwd_spd" value="100"></div>
-                            <div class="setting-row"><span style="width: 140px; text-align: left;">RIGHT_SPEED:</span><input type="number" id="rgt_spd" value="10"></div>
-                            <div class="setting-row"><span style="width: 140px; text-align: left;">RIGHT_ANGLE:</span><input type="number" id="rgt_ang" value="90"></div>
-                            <div class="setting-row"><span style="width: 140px; text-align: left;">LEFT_SPEED:</span><input type="number" id="lft_spd" value="10"></div>
-                            <div class="setting-row"><span style="width: 140px; text-align: left;">LEFT_ANGLE:</span><input type="number" id="lft_ang" value="-90"></div>
-                            <div class="setting-row"><span style="width: 140px; text-align: left;">BACKWARD_SPEED:</span><input type="number" id="bck_spd" value="100"></div>
+                            
+                            <div class="setting-row">
+                                <span style="width: 140px; text-align: left;">FORWARD_SPEED:</span>
+                                <select id="fwd_spd">
+                                    <option value="0">0</option>
+                                    <option value="25">25</option>
+                                    <option value="50">50</option>
+                                    <option value="75">75</option>
+                                    <option value="100" selected>100</option>
+                                </select>
+                            </div>
+                            
+                            <div class="setting-row">
+                                <span style="width: 140px; text-align: left;">BACKWARD_SPEED:</span>
+                                <select id="bck_spd">
+                                    <option value="0">0</option>
+                                    <option value="25">25</option>
+                                    <option value="50">50</option>
+                                    <option value="75">75</option>
+                                    <option value="100" selected>100</option>
+                                </select>
+                            </div>
+                            
+                            <div class="setting-row">
+                                <span style="width: 140px; text-align: left;">RIGHT_SPEED:</span>
+                                <select id="rgt_spd">
+                                    <option value="0">0</option>
+                                    <option value="3">3</option>
+                                    <option value="7">7</option>
+                                    <option value="10" selected>10</option>
+                                </select>
+                            </div>
+                            
+                            <div class="setting-row">
+                                <span style="width: 140px; text-align: left;">RIGHT_ANGLE:</span>
+                                <select id="rgt_ang">
+                                    <option value="0">0</option>
+                                    <option value="45">45</option>
+                                    <option value="90" selected>90</option>
+                                    <option value="180">180</option>
+                                </select>
+                            </div>
+                            
+                            <div class="setting-row">
+                                <span style="width: 140px; text-align: left;">LEFT_SPEED:</span>
+                                <select id="lft_spd">
+                                    <option value="0">0</option>
+                                    <option value="3">3</option>
+                                    <option value="7">7</option>
+                                    <option value="10" selected>10</option>
+                                </select>
+                            </div>
+                            
+                            <div class="setting-row">
+                                <span style="width: 140px; text-align: left;">LEFT_ANGLE:</span>
+                                <select id="lft_ang">
+                                    <option value="0">0</option>
+                                    <option value="-45">-45</option>
+                                    <option value="-90" selected>-90</option>
+                                    <option value="-180">-180</option>
+                                </select>
+                            </div>
+
                         </div>
                     </div>
                 </div>
@@ -221,16 +311,16 @@
         ACTIVE HARDWARE LINK: <span id="hardware-id" style="color: var(--neon-red); font-weight: bold;">DISCONNECTED</span>
     </div>
 
-    <script src="matrix.js?v=32.0"></script>
-    <script src="state.js?v=32.0"></script>
-    <script src="terminal.js?v=32.0"></script>
-    <script src="checksum.js?v=32.0"></script>
-    <script src="sensor.js?v=32.0"></script>
-    <script src="deduction.js?v=32.0"></script>
-    <script src="dragdrop.js?v=32.0"></script>
+    <script src="matrix.js?v=37.0"></script>
+    <script src="state.js?v=37.0"></script>
+    <script src="terminal.js?v=37.0"></script>
+    <script src="checksum.js?v=37.0"></script>
+    <script src="sensor.js?v=37.0"></script>
+    <script src="deduction.js?v=37.0"></script>
+    <script src="dragdrop.js?v=37.0"></script>
 
-    <script src="bluetooth.js?v=32.0"></script>
-    <script type="py" src="app.py?v=32.0"></script>
+    <script src="bluetooth.js?v=37.0"></script>
+    <script type="py" src="app.py?v=37.0"></script>
 
 </body>
 </html>
