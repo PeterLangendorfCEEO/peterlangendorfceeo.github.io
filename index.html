@@ -8,12 +8,58 @@
     <link rel="stylesheet" href="https://pyscript.net/releases/2023.11.1/core.css" />
     <script type="module" src="https://pyscript.net/releases/2023.11.1/core.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=22.0">
+    <link rel="stylesheet" href="style.css?v=32.0">
 </head>
 <body>
 
     <canvas id="matrix-bg"></canvas>
     <div id="grid-overlay"></div>
+    <div id="transition-wipe"></div>
+
+    <div id="hijack-overlay" style="display:none;">
+        <div id="hijack-scene" id="hijack-scene">
+            <div class="hijack-pc">
+                <svg width="100" height="100" viewBox="0 0 16 16" shape-rendering="crispEdges">
+                    <rect x="2" y="2" width="12" height="8" fill="#555"/>
+                    <rect x="3" y="3" width="10" height="6" fill="#00ff41"/>
+                    <rect x="4" y="10" width="8" height="2" fill="#777"/>
+                    <rect x="1" y="12" width="14" height="2" fill="#555"/>
+                </svg>
+            </div>
+            
+            <div class="hijack-stream" id="h-stream">
+                <div class="binary-row">01001101 01100001 01110011 01110100 01100101 01110010 01100011 01101000 01001101 01100001</div>
+                <div class="binary-row">01101001 01100101 01100110 00100000 01110011 01110000 01100001 01110010 01101001 01100101</div>
+                <div class="binary-row">01110100 01100001 01101110 00100000 00110001 00110001 00110111 00000000 01110100 01100001</div>
+                
+                <img class="hijack-packet" id="h-packet" src="packet.png" alt="DATA">
+            </div>
+
+            <div class="hijack-hacker" id="h-hacker">
+                <svg width="120" height="120" viewBox="0 0 16 16" shape-rendering="crispEdges">
+                    <rect x="1" y="1" width="14" height="10" fill="#222"/>
+                    <rect x="2" y="2" width="12" height="8" fill="#ff003c"/>
+                    <rect x="5" y="4" width="2" height="2" fill="#000"/>
+                    <rect x="9" y="4" width="2" height="2" fill="#000"/>
+                    <rect x="4" y="7" width="8" height="2" fill="#000"/>
+                    <rect x="3" y="11" width="10" height="2" fill="#111"/>
+                    <rect x="0" y="13" width="16" height="3" fill="#222"/>
+                </svg>
+            </div>
+
+            <div class="hijack-bot">
+                <svg width="100" height="100" viewBox="0 0 16 16" shape-rendering="crispEdges">
+                    <rect x="4" y="4" width="8" height="8" fill="#aaa"/>
+                    <rect x="5" y="6" width="2" height="2" fill="#00f0ff"/>
+                    <rect x="9" y="6" width="2" height="2" fill="#00f0ff"/>
+                    <rect x="7" y="1" width="2" height="3" fill="#888"/>
+                    <rect x="2" y="12" width="4" height="4" fill="#555"/>
+                    <rect x="10" y="12" width="4" height="4" fill="#555"/>
+                </svg>
+            </div>
+        </div>
+    </div>
+
 
     <div id="loading-screen">
         <div class="loader-title">[ SYSTEM_BOOT_SEQUENCE ]</div>
@@ -45,10 +91,10 @@
             <h2 style="text-align: center; color: var(--neon-cyan); margin-top: 0; margin-bottom: 15px; text-shadow: 0 0 10px rgba(0,240,255,0.4);">[ SENSOR TELEMETRY LOG ]</h2>
             
             <div style="display: flex; gap: 20px; align-items: stretch; margin-bottom: 5px;">
-                <div class="analysis-guide" style="flex: 1;">
-                    <strong>HOW TO READ THE GRAPH:</strong> Look at the lines to see how the motors moved. In a healthy robot, the green and blue lines should always be a perfect, beautiful reflection of each other! If one of the lines flatlines at 0%, it means that motor failed!
+                <div class="analysis-guide" style="flex: 1; padding: 12px; background: rgba(0,240,255,0.05); color: #aaa; font-size: 0.9em; border-left: 3px solid var(--neon-cyan);">
+                    <strong>ANALYSIS:</strong> Look for flatlines at 0%. If the motor drops to 0% when it should be moving, it means the motor failed!
                 </div>
-                <button id="btn-toggle-graph" onclick="window.toggleGraphMode()" class="btn-success btn-toggle-normal" style="width: auto; margin-top: 0; padding: 10px 20px; height: 100%;">Mode:<br>Normal (Simplified)</button>
+                <button id="btn-toggle-graph" onclick="window.toggleGraphMode()" class="btn-success btn-toggle-normal" style="width: auto; margin-top: 0; padding: 10px 20px;">Mode:<br>Normal</button>
             </div>
             
             <div class="canvas-container">
@@ -67,12 +113,7 @@
     <div id="deduction-overlay" class="modal-overlay" style="display: none; z-index: 250;">
         <div class="modal-content" style="max-width: 900px;">
             <h2 style="text-align: center; color: var(--neon-cyan); margin-top: 0; text-shadow: 0 0 10px rgba(0,240,255,0.4);">[ INCIDENT REPORT ]</h2>
-            <div class="analysis-guide" style="margin-top: 0; margin-bottom: 15px;">
-                <strong>SUBMIT YOUR GUESSES:</strong> Review the Memory Audit and Sensor Logs. For every executed instruction, toggle the buttons to officially declare if it was <strong>VALID</strong>, if the hacker <strong>BREACHED</strong> it, or if the hardware was physically <strong>BROKEN</strong>! 
-            </div>
-            
-            <div id="deduction-list" style="overflow-y: auto; max-height: 50vh; display: flex; flex-direction: column; gap: 10px; padding-right: 10px;"></div>
-            
+            <div id="deduction-list" style="overflow-y: auto; max-height: 50vh; display: flex; flex-direction: column; gap: 10px; padding-right: 10px; margin-top: 15px;"></div>
             <div style="display: flex; gap: 15px; margin-top: 25px;">
                 <button onclick="window.closeDeduction()" class="btn-success" style="flex: 1; border-color: var(--neon-cyan); color: var(--neon-cyan); background: rgba(0, 240, 255, 0.05);">Wait, Let Me Check</button>
                 <button onclick="window.submitDeduction()" class="btn-success" style="flex: 2; border-color: var(--neon-green); color: var(--neon-green); background: rgba(0, 255, 65, 0.05);">Submit Final Report</button>
@@ -91,47 +132,67 @@
     <h1 class="game-title">Buggy, Broken, or Breached!</h1>
 
     <div class="container" id="step-builder">
-        
         <div class="panel panel-center" id="panel-sequence">
             <h3 id="sequence-header">[ Phase 1: Programmer_Input ]</h3>
-            <div class="btn-grid">
-                <button id="btn-forward">Forward</button>
-                <button id="btn-back">Back</button>
-                <button id="btn-left">Left</button>
-                <button id="btn-right">Right</button>
+            
+            <div id="shared-editor" style="display: flex; flex-direction: column; flex: 1; min-height: 0;">
+                <div class="btn-grid">
+                    <button id="btn-forward">Forward</button>
+                    <button id="btn-back">Back</button>
+                    <button id="btn-left">Left</button>
+                    <button id="btn-right">Right</button>
+                </div>
+                <div id="move-listbox"></div>
+                <div class="btn-grid no-margin" style="margin-top: 15px;">
+                    <button id="btn-remove">Delete Selected</button>
+                    <button id="btn-clear">Clear All</button>
+                </div>
             </div>
             
-            <div id="move-listbox"></div>
-            
-            <div class="btn-grid no-margin">
-                <button id="btn-remove">Delete Selected</button>
-                <button id="btn-clear">Clear All</button>
-            </div>
-            
-            <button id="btn-phase1-next" onclick="window.goToPhase2()" class="btn-success">Next Phase -></button>
-        </div>
-
-        <div class="panel" id="panel-parameters" style="display: none; border-color: var(--neon-red); border-top-color: var(--neon-red);">
-            <h3 style="color: var(--neon-red); border-color: var(--neon-red);">[ Phase 2: Attacker_Parameters ]</h3>
-            <div class="setting-row"><span>Forward Speed:</span><input type="number" id="fwd_spd" value="100"></div>
-            <div class="setting-row"><span>Right Speed:</span><input type="number" id="rgt_spd" value="10"></div>
-            <div class="setting-row"><span>Right Angle:</span><input type="number" id="rgt_ang" value="90"></div>
-            <div class="setting-row"><span>Left Speed:</span><input type="number" id="lft_spd" value="10"></div>
-            <div class="setting-row"><span>Left Angle:</span><input type="number" id="lft_ang" value="-90"></div>
-            <div class="setting-row"><span>Backward Speed:</span><input type="number" id="bck_spd" value="100"></div>
-
-            <div id="hacker-terminal">
-                <span>> ROOT ACCESS GRANTED...</span>
-                <span>> AWAITING PAYLOAD MODIFICATIONS...</span>
-            </div>
-
-            <button onclick="window.goToPhase3()" class="btn-success" style="margin-top: 0; color: var(--neon-red); border-color: var(--neon-red);">Finalize Payload & Deploy -></button>
+            <button id="btn-phase1-next" onclick="window.goToPhase2(event)" class="btn-success">Next Phase -></button>
         </div>
     </div>
 
     <div id="attacker-overlay" style="display: none;">
         <button onclick="window.unblurAttacker()" class="btn-danger">UNAUTHORIZED ACCESS<br><br>Click to assume Attacker role</button>
     </div>
+    
+    <div class="container" id="phase2-container">
+        <div id="hacker-bash">
+            <div class="bash-header">root@sys:~/frc_telemetry/payload_injection</div>
+            <div class="bash-body">
+                <div class="bash-logs" id="bash-logs">
+                    <span style="color: #888;">[ SYSTEM ] Establishing Secure Shell...</span>
+                    <span><span style="color: var(--neon-red);">root@sys:~#</span> ACCESS GRANTED. Payload unlocked.</span>
+                </div>
+                
+                <div class="bash-editor">
+                    <div class="editor-col">
+                        <h4>// SEQUENCE_ARRAY</h4>
+                        <div id="phase2-list-container" style="flex: 1; display: flex; flex-direction: column; min-height: 150px;"></div>
+                    </div>
+                    
+                    <div class="editor-col" style="border-left: 1px dashed #333; padding-left: 20px;">
+                        <h4>// MOTOR_CONSTANTS</h4>
+                        <div style="flex: 1; overflow-y: auto; padding-right: 10px;">
+                            <div class="setting-row"><span style="width: 140px; text-align: left;">FORWARD_SPEED:</span><input type="number" id="fwd_spd" value="100"></div>
+                            <div class="setting-row"><span style="width: 140px; text-align: left;">RIGHT_SPEED:</span><input type="number" id="rgt_spd" value="10"></div>
+                            <div class="setting-row"><span style="width: 140px; text-align: left;">RIGHT_ANGLE:</span><input type="number" id="rgt_ang" value="90"></div>
+                            <div class="setting-row"><span style="width: 140px; text-align: left;">LEFT_SPEED:</span><input type="number" id="lft_spd" value="10"></div>
+                            <div class="setting-row"><span style="width: 140px; text-align: left;">LEFT_ANGLE:</span><input type="number" id="lft_ang" value="-90"></div>
+                            <div class="setting-row"><span style="width: 140px; text-align: left;">BACKWARD_SPEED:</span><input type="number" id="bck_spd" value="100"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="bash-cmd-line">
+                <span style="color: var(--neon-red); font-size: 1.2em; font-weight: bold;">root@sys:~#</span> <span id="typing-span" style="color: #fff; margin-left: 10px; font-size: 1.1em;"></span><span class="bash-cursor"></span>
+            </div>
+
+            <button onclick="window.goToPhase3(event)" class="btn-success" style="margin-top: 25px; color: var(--neon-red); border-color: var(--neon-red);">Finalize Payload & Deploy -></button>
+        </div>
+    </div>
+
 
     <div class="container" id="step-execution" style="display: none;">
         <div class="col">
@@ -144,7 +205,6 @@
                     <button id="btn-diagnostics" onclick="window.openChecksum()" class="btn-success" style="margin-top: 0; font-size: 0.9em;" disabled>Memory Audit</button>
                     <button id="btn-sensors" onclick="window.openSensors()" class="btn-success" style="margin-top: 0; font-size: 0.9em;" disabled>Sensor Graph</button>
                 </div>
-                
                 <button id="btn-deduction" onclick="window.openDeduction()" class="btn-success" style="margin-top: 10px; font-size: 1em; border-color: #ffd700; color: #ffd700; background: rgba(255, 215, 0, 0.05); text-shadow: 0 0 8px rgba(255, 215, 0, 0.4);" disabled>Submit Final Report</button>
             </div>
         </div>
@@ -155,13 +215,22 @@
         </div>
     </div>
 
+    <div id="move-listbox" style="display: none;"></div>
+
     <div id="footer-status">
         ACTIVE HARDWARE LINK: <span id="hardware-id" style="color: var(--neon-red); font-weight: bold;">DISCONNECTED</span>
     </div>
 
-    <script src="main.js?v=22.0"></script>
-    <script src="bluetooth.js?v=22.0"></script>
-    <script type="py" src="app.py?v=22.0"></script>
+    <script src="matrix.js?v=32.0"></script>
+    <script src="state.js?v=32.0"></script>
+    <script src="terminal.js?v=32.0"></script>
+    <script src="checksum.js?v=32.0"></script>
+    <script src="sensor.js?v=32.0"></script>
+    <script src="deduction.js?v=32.0"></script>
+    <script src="dragdrop.js?v=32.0"></script>
+
+    <script src="bluetooth.js?v=32.0"></script>
+    <script type="py" src="app.py?v=32.0"></script>
 
 </body>
 </html>

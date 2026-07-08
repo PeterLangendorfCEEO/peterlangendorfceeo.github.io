@@ -10,6 +10,7 @@ DIR_CW = 0
 DIR_CCW = 1
 
 is_connected = False
+move_id_counter = 0
 
 def normalize_angle(angle):
     if angle > 180: return angle - 360
@@ -37,12 +38,20 @@ def update_status():
         set_status("Ready to execute!", color="#00ffcc")
 
 def add_move(move):
+    global move_id_counter
     listbox = document.querySelector("#move-listbox")
     if not listbox: return
     item = document.createElement("div")
     item.className = "list-item"
     item.draggable = True
     item.innerText = move.lower()
+    # Give this specific move instance a permanent, unique identity.
+    # This is what lets the checksum/deduction rounds tell the difference
+    # between "this exact instruction moved" vs "this instruction was
+    # deleted and a different one was inserted", even when two moves
+    # share the same value (e.g. two "forward"s).
+    item.setAttribute("data-move-id", str(move_id_counter))
+    move_id_counter += 1
     listbox.appendChild(item)
     update_status()
 
