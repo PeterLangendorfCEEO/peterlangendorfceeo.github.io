@@ -8,8 +8,7 @@
     <link rel="stylesheet" href="https://pyscript.net/releases/2023.11.1/core.css" />
     <script type="module" src="https://pyscript.net/releases/2023.11.1/core.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
-    
-    <link rel="stylesheet" href="style.css?v=21.0">
+    <link rel="stylesheet" href="style.css?v=22.0">
 </head>
 <body>
 
@@ -121,7 +120,12 @@
             <div class="setting-row"><span>Left Angle:</span><input type="number" id="lft_ang" value="-90"></div>
             <div class="setting-row"><span>Backward Speed:</span><input type="number" id="bck_spd" value="100"></div>
 
-            <button onclick="window.goToPhase3()" class="btn-success" style="margin-top: auto; color: var(--neon-red); border-color: var(--neon-red);">Finalize Payload & Deploy -></button>
+            <div id="hacker-terminal">
+                <span>> ROOT ACCESS GRANTED...</span>
+                <span>> AWAITING PAYLOAD MODIFICATIONS...</span>
+            </div>
+
+            <button onclick="window.goToPhase3()" class="btn-success" style="margin-top: 0; color: var(--neon-red); border-color: var(--neon-red);">Finalize Payload & Deploy -></button>
         </div>
     </div>
 
@@ -155,9 +159,9 @@
         ACTIVE HARDWARE LINK: <span id="hardware-id" style="color: var(--neon-red); font-weight: bold;">DISCONNECTED</span>
     </div>
 
-    <script src="main.js?v=21.0"></script>
-    <script src="bluetooth.js?v=21.0"></script>
-    <script type="py" src="app.py?v=21.0"></script>
+    <script src="main.js?v=22.0"></script>
+    <script src="bluetooth.js?v=22.0"></script>
+    <script type="py" src="app.py?v=22.0"></script>
 
 </body>
 </html>

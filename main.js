@@ -9,21 +9,18 @@ const fontSize = 16;
 const columns = mCanvas.width / fontSize;
 const drops = [];
 
-// Initialize drops randomly across the Y axis
 for (let x = 0; x < columns; x++) {
     drops[x] = Math.floor(Math.random() * (mCanvas.height / fontSize));
 }
 
 let matrixIntervalId;
 
-// THE FIX: Transparency is set to 0.15 globally, and speed is dropped to 120ms
 window.matrixSettings = {
     color: 'rgba(0, 255, 65, 0.15)', 
     fade: 'rgba(13, 13, 18, 0.05)',
     speed: 120 
 };
 
-// THE FIX: Simulate 100 frames instantly so the screen starts completely full of rain!
 mCtx.fillStyle = '#0d0d12';
 mCtx.fillRect(0, 0, mCanvas.width, mCanvas.height);
 for(let i = 0; i < 100; i++) {
@@ -71,6 +68,61 @@ let robotState = [];
 let deductionState = []; 
 let auditPairs = []; 
 let checksRemaining = 3;
+window.currentPhase = 1; // Tracks game state for the Hacker Terminal
+
+window.logHackerAction = function(cmd) {
+    if (window.currentPhase !== 2) return;
+    const term = document.getElementById('hacker-terminal');
+    if (!term) return;
+    
+    const now = new Date();
+    const time = `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}:${now.getSeconds().toString().padStart(2,'0')}`;
+    
+    const span = document.createElement('span');
+    span.innerHTML = `<span style="color: #555;">[${time}]</span> <span style="color: var(--neon-red);">root@sys:~#</span> ${cmd}`;
+    term.appendChild(span);
+    term.scrollTop = term.scrollHeight;
+}
+
+// Attach Event Listeners to Settings to trigger Hacker Terminal
+const settingsInputs = ['fwd_spd', 'rgt_spd', 'rgt_ang', 'lft_spd', 'lft_ang', 'bck_spd'];
+settingsInputs.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+        el.addEventListener('change', (e) => {
+            window.logHackerAction(`SET_PARAM --env="${id}" --val="${e.target.value}"`);
+        });
+    }
+});
+
+// Use MutationObserver to securely catch Python adding/removing DOM elements
+let isDraggingMove = false;
+let previousOrder = [];
+const listbox = document.getElementById('move-listbox');
+
+const observer = new MutationObserver((mutations) => {
+    if (window.currentPhase !== 2) return;
+    if (isDraggingMove) return; 
+
+    mutations.forEach(mutation => {
+        if (mutation.type === 'childList') {
+            mutation.addedNodes.forEach(node => {
+                if (node.nodeType === 1 && node.classList.contains('list-item')) {
+                    window.logHackerAction(`INJECT_PAYLOAD --inst="${node.innerText.trim()}"`);
+                }
+            });
+            mutation.removedNodes.forEach(node => {
+                if (node.nodeType === 1 && node.classList.contains('list-item')) {
+                    window.logHackerAction(`OVERWRITE --mem_block="${node.innerText.trim()}" --val=NULL`);
+                }
+            });
+        }
+    });
+});
+if (listbox) {
+    observer.observe(listbox, { childList: true });
+}
+
 
 window.captureState = function() {
     let state = [];
@@ -102,9 +154,11 @@ window.goToPhase2 = function() {
     document.getElementById('panel-sequence').style.borderTopColor = 'var(--neon-red)';
     document.getElementById('attacker-overlay').style.display = 'flex';
 
-    // Matrix becomes Red
     window.matrixSettings.color = 'rgba(255, 0, 60, 0.15)'; 
     applyMatrixSettings();
+
+    // Officially enter Phase 2 so the Hacker Terminal wakes up
+    window.currentPhase = 2;
 }
 
 window.unblurAttacker = function() {
@@ -156,6 +210,7 @@ function buildAlignment() {
 }
 
 window.goToPhase3 = function() {
+    window.currentPhase = 3;
     robotState = window.captureState();
     
     deductionState = []; 
@@ -167,15 +222,11 @@ window.goToPhase3 = function() {
     document.getElementById('step-builder').style.display = 'none';
     document.getElementById('step-execution').style.display = 'flex';
 
-    // Matrix returns to Green
     window.matrixSettings.color = 'rgba(0, 255, 65, 0.15)';
     applyMatrixSettings();
 }
 
 // --- CHECKSUM DIAGNOSTICS ---
-let selLeft = null;
-let selRight = null;
-
 window.openChecksum = function() { document.getElementById('checksum-overlay').style.display = 'flex'; }
 window.closeChecksum = function() { document.getElementById('checksum-overlay').style.display = 'none'; }
 
@@ -674,8 +725,25 @@ window.drawSensorGraph = function() {
 const listbox = document.getElementById('move-listbox');
 document.addEventListener('click', (e) => { if (!e.target.closest('#move-listbox') && !e.target.closest('#btn-remove')) { document.querySelectorAll('.list-item.selected').forEach(el => el.classList.remove('selected')); } });
 listbox.addEventListener('click', (e) => { if (e.target.classList.contains('list-item')) { document.querySelectorAll('.list-item.selected').forEach(el => el.classList.remove('selected')); e.target.classList.add('selected'); } });
-listbox.addEventListener('dragstart', (e) => { if(e.target.classList.contains('list-item')) { setTimeout(() => e.target.classList.add('dragging'), 0); } });
-listbox.addEventListener('dragend', (e) => { if(e.target.classList.contains('list-item')) { e.target.classList.remove('dragging'); } });
+listbox.addEventListener('dragstart', (e) => { 
+    if(e.target.classList.contains('list-item')) { 
+        isDraggingMove = true;
+        previousOrder = Array.from(listbox.children).map(c => c.innerText);
+        setTimeout(() => e.target.classList.add('dragging'), 0); 
+    } 
+});
+listbox.addEventListener('dragend', (e) => { 
+    if(e.target.classList.contains('list-item')) { 
+        e.target.classList.remove('dragging'); 
+        isDraggingMove = false;
+        if (window.currentPhase === 2) {
+            const currentOrder = Array.from(listbox.children).map(c => c.innerText);
+            if (JSON.stringify(previousOrder) !== JSON.stringify(currentOrder)) {
+                window.logHackerAction(`MEM_SHIFT --ptr_realloc=SUCCESS`);
+            }
+        }
+    } 
+});
 listbox.addEventListener('dragover', (e) => {
     e.preventDefault();
     const afterElement = getDragAfterElement(listbox, e.clientY);

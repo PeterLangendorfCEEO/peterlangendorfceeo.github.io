@@ -158,3 +158,22 @@ div#move-listbox { width: 100%; flex: 1; min-height: 100px; margin-bottom: 20px;
 .programmer-win { color: #fff; animation: textReveal 0.5s ease-out forwards, cyberPulse 2s linear infinite 0.5s; }
 @keyframes textReveal { 0% { opacity: 0; transform: translateY(20px) scale(0.9); letter-spacing: -5px; filter: blur(5px); } 100% { opacity: 1; transform: translateY(0) scale(1); letter-spacing: normal; filter: blur(0); } }
 @keyframes cyberPulse { 0%, 100% { text-shadow: 0 0 10px #00ff41, 0 0 20px #00ff41, 0 0 40px #00ff41; color: #fff; } 50% { text-shadow: 0 0 20px #00ff41, 0 0 40px #00ff41, 0 0 80px #00ff41; color: #ccffcc; } }
+
+/* --- HACKER TERMINAL --- */
+#hacker-terminal {
+    background: #050505;
+    color: var(--neon-red);
+    padding: 12px;
+    border: 1px solid var(--neon-red);
+    border-radius: 4px;
+    margin-top: auto;
+    margin-bottom: 15px;
+    height: 140px;
+    overflow-y: auto;
+    font-size: 0.85em;
+    font-family: 'Share Tech Mono', monospace;
+    display: flex;
+    flex-direction: column;
+    box-shadow: inset 0 0 10px rgba(255, 0, 60, 0.2);
+}
+#hacker-terminal span { margin-bottom: 4px; }
