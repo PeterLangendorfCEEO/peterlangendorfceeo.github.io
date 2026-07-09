@@ -315,7 +315,6 @@ function buildAlignment() {
     }
 }
 
-// THE FIX: Hardcoded global variables to ensure cache clears
 window.currentHelpStep = 1;
 window.TOTAL_HELP_STEPS = 7;
 
@@ -392,6 +391,4 @@ document.addEventListener('keydown', function(event) {
     }
 });
 
-window.addEventListener('DOMContentLoaded', () => {
-    window.openHelp();
-});
+// REMOVED DOMContentLoaded LISTENER FROM HERE

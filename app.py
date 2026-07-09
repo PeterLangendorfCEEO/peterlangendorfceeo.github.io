@@ -45,13 +45,13 @@ def add_move(move):
     if window.currentPhase == 2:
         selected_items = document.querySelectorAll(".list-item.selected")
         if selected_items.length == 1:
-            window.saveHackerState() # THE FIX: Logs Undo State
+            window.saveHackerState() 
             item = selected_items.item(0)
             item.innerText = move.lower()
             item.classList.remove('selected')
             window.logHackerAction(f"mem.ovr @ptr={item.getAttribute('data-move-id')} !val={move.upper()}")
             window.syncSettings()
-            window.syncHackerButtons() # THE FIX: Re-Greys out the buttons!
+            window.syncHackerButtons() 
             update_status()
         return
 
@@ -67,14 +67,14 @@ def add_move(move):
 def remove_selected(event):
     selected_items = document.querySelectorAll(".list-item.selected")
     if selected_items.length > 0:
-        if window.currentPhase == 2: window.saveHackerState() # THE FIX: Logs Undo State
+        if window.currentPhase == 2: window.saveHackerState() 
         for i in range(selected_items.length):
             if window.currentPhase == 2:
                 ptr = selected_items.item(i).getAttribute('data-move-id')
                 window.logHackerAction(f"mem.free @ptr={ptr}")
             selected_items.item(i).remove()
         window.syncSettings()
-        window.syncHackerButtons() # THE FIX: Re-Greys out the buttons!
+        window.syncHackerButtons() 
         update_status()
 
 def clear_all(event):
@@ -267,4 +267,7 @@ except Exception as e:
     print_term(f"Initialization Error: {str(e)}", color="red")
 finally:
     loader = document.getElementById("loading-screen")
-    if loader: loader.classList.add("fade-out")
+    if loader: 
+        loader.classList.add("fade-out")
+        # THE FIX: Wait 800ms for the load screen to fade, THEN pop the help menu!
+        window.setTimeout(window.openHelp, 1)
