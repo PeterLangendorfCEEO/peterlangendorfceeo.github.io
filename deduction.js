@@ -7,7 +7,8 @@ window.openDeduction = function() {
     
     if (container.children.length === 0) {
         deductionState = [];
-        let moveIndex = 0;
+        // THE FIX: Start index at 1
+        let moveIndex = 1;
         
         auditPairs.forEach((pair, index) => {
             deductionState.push({ valid: false, breached: false, broken: false });

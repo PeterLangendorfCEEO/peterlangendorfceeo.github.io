@@ -45,13 +45,13 @@ def add_move(move):
     if window.currentPhase == 2:
         selected_items = document.querySelectorAll(".list-item.selected")
         if selected_items.length == 1:
-            window.saveHackerState() 
+            if hasattr(window, 'saveHackerState'): window.saveHackerState()
             item = selected_items.item(0)
             item.innerText = move.lower()
             item.classList.remove('selected')
-            window.logHackerAction(f"mem.ovr @ptr={item.getAttribute('data-move-id')} !val={move.upper()}")
-            window.syncSettings()
-            window.syncHackerButtons() 
+            if hasattr(window, 'logHackerAction'): window.logHackerAction(f"mem.ovr @ptr={item.getAttribute('data-move-id')} !val={move.upper()}")
+            if hasattr(window, 'syncSettings'): window.syncSettings()
+            if hasattr(window, 'syncHackerButtons'): window.syncHackerButtons()
             update_status()
         return
 
@@ -67,14 +67,14 @@ def add_move(move):
 def remove_selected(event):
     selected_items = document.querySelectorAll(".list-item.selected")
     if selected_items.length > 0:
-        if window.currentPhase == 2: window.saveHackerState() 
+        if window.currentPhase == 2 and hasattr(window, 'saveHackerState'): window.saveHackerState()
         for i in range(selected_items.length):
-            if window.currentPhase == 2:
+            if window.currentPhase == 2 and hasattr(window, 'logHackerAction'):
                 ptr = selected_items.item(i).getAttribute('data-move-id')
                 window.logHackerAction(f"mem.free @ptr={ptr}")
             selected_items.item(i).remove()
-        window.syncSettings()
-        window.syncHackerButtons() 
+        if hasattr(window, 'syncSettings'): window.syncSettings()
+        if hasattr(window, 'syncHackerButtons'): window.syncHackerButtons()
         update_status()
 
 def clear_all(event):
@@ -131,7 +131,7 @@ async def run_sequence(event):
     if document.querySelector("#btn-deduction"): document.querySelector("#btn-deduction").setAttribute("disabled", "true")
 
     listbox = document.querySelector("#move-listbox")
-    move_set = [listbox.children.item(i).innerText.lower() for i in range(listbox.children.length)]
+    move_count = listbox.children.length
 
     settings = {
         "forward_speed": document.querySelector("#fwd_spd").value,
@@ -143,7 +143,7 @@ async def run_sequence(event):
     }
 
     failures_list = []
-    for _ in move_set:
+    for _ in range(move_count):
         failed = False
         if random.randint(1, 100) <= ENGINE_FAILURE_CHANCE:
             failed = True
@@ -160,10 +160,19 @@ async def run_sequence(event):
     LEFT = window.legoBluetooth.MOTOR_BITS_LEFT
     RIGHT = window.legoBluetooth.MOTOR_BITS_RIGHT
 
-    for idx, move in enumerate(move_set):
+    for idx in range(move_count):
+        node = listbox.children.item(idx)
+        move = node.innerText.lower()
+        move_id = node.getAttribute("data-move-id")
+        
         left_failed = False
         right_failed = False
-        window.currentMoveLabel = move.upper()
+        
+        if hasattr(window, 'getOriginalInstructionLabel'):
+            window.currentMoveLabel = window.getOriginalInstructionLabel(move_id)
+        else:
+            # THE FIX: Shifted the fallback indexing to 1-based logic
+            window.currentMoveLabel = f"Instr [{idx + 1}]"
 
         if failures_list[idx]:
             if random.randint(1, 2) == 1: left_failed = True
@@ -266,8 +275,10 @@ try:
 except Exception as e:
     print_term(f"Initialization Error: {str(e)}", color="red")
 finally:
-    loader = document.getElementById("loading-screen")
-    if loader: 
-        loader.classList.add("fade-out")
-        # THE FIX: Wait 800ms for the load screen to fade, THEN pop the help menu!
-        window.setTimeout(window.openHelp, 1)
+    if hasattr(window, 'triggerBootSequence'):
+        window.triggerBootSequence()
+    else:
+        loader = document.getElementById("loading-screen")
+        if loader: 
+            loader.classList.add("fade-out")
+            window.setTimeout(getattr(window, 'openHelp', lambda: None), 800)

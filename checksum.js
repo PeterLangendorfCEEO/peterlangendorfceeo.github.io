@@ -23,11 +23,11 @@ window.renderChecksumLists = function() {
     const container = document.getElementById('checksum-blocks');
     container.innerHTML = '';
     
-    let moveIndex = 0;
+    // THE FIX: Start index at 1
+    let moveIndex = 1;
     let hasShownDivider = false;
     
     auditPairs.forEach((pair, index) => {
-        // Inject divider before the first setting
         if (!pair.isMove && !hasShownDivider) {
             let divider = document.createElement('div');
             divider.style.borderTop = "1px dashed var(--border-color)";
@@ -44,7 +44,6 @@ window.renderChecksumLists = function() {
         block.className = 'mem-block';
         block.id = `audit-block-${index}`;
         
-        // Format label differently for moves vs settings
         let label = pair.isMove ? `Instruction [${moveIndex}] : ${pair.pItem.value}` : `${pair.pItem.label} : ${pair.pItem.value}`;
         
         block.innerHTML = `<span>${label}</span> <span class="hash-text" style="color: #888;">[ UNAUDITED ]</span>`;
@@ -58,11 +57,28 @@ window.renderChecksumLists = function() {
 
 window.inspectMove = function(index, pair) {
     if (checkedBlocks.has(index)) return; 
-    if (checksRemaining <= 0) { alert("SYSTEM LOCKED: NO CHECKS REMAINING!"); return; }
+    if (checksRemaining <= 0) return; 
     
     checksRemaining--;
     document.getElementById('checks-counter').innerText = `CHECKS REMAINING: ${checksRemaining}`;
     checkedBlocks.add(index);
+    
+    if (checksRemaining === 0) {
+        document.querySelectorAll('.mem-block').forEach(block => {
+            let blockIdx = parseInt(block.id.replace('audit-block-', ''));
+            if (!checkedBlocks.has(blockIdx)) {
+                block.style.opacity = '0.3';
+                block.style.pointerEvents = 'none';
+                block.style.filter = 'grayscale(100%)';
+                
+                let hashTxt = block.querySelector('.hash-text');
+                if (hashTxt) {
+                    hashTxt.innerText = '[ LOCKED ]';
+                    hashTxt.style.color = '#555';
+                }
+            }
+        });
+    }
     
     const closeBtn = document.getElementById('btn-close-diagnostics');
     if (closeBtn) closeBtn.style.display = 'none';
@@ -73,14 +89,12 @@ window.inspectMove = function(index, pair) {
     document.getElementById('btn-anim-back').style.pointerEvents = 'none';
     document.getElementById('anim-result').innerText = '';
     
-    // Format animation values differently for moves vs settings
     document.getElementById('anim-p-val').innerText = pair.isMove ? pair.pItem.value : `${pair.pItem.id}=${pair.pItem.value}`;
     document.getElementById('anim-r-val').innerText = "?????";
     
     let pHashEl = document.getElementById('anim-p-hash');
     let rHashEl = document.getElementById('anim-r-hash');
     
-    // Extract proper IDs for the hash calculation
     let pId = pair.isMove ? pair.pItem.moveId : pair.pItem.id;
     let rId = pair.isMove ? (pair.rItem.virtual ? "VIRTUAL" : pair.rItem.moveId) : pair.rItem.id;
     

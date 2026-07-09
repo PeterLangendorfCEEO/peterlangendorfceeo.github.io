@@ -6,12 +6,11 @@ var telemetryHistory = [];
 var isRecording = false;
 var recordStartMs = 0;
 var graphMode = 'normal'; 
-window.currentMoveLabel = "IDLE"; 
+window.currentMoveLabel = "IDLE";
 var t_leftSpeed = 0;
 var t_rightSpeed = 0;
 
 window.setCurrentTargetSpeeds = function(left, right) { t_leftSpeed = left; t_rightSpeed = right; };
-
 window.toggleGraphMode = function() {
     graphMode = graphMode === 'normal' ? 'advanced' : 'normal';
     const btn = document.getElementById('btn-toggle-graph');
@@ -46,7 +45,8 @@ window.drawSensorGraph = function() {
     const ctx = canvas.getContext('2d');
     const h = 400; const pad = 40; const leftPad = 60; 
     
-    let regions = []; let currentRegion = null;
+    let regions = [];
+    let currentRegion = null;
     for (let pt of telemetryHistory) {
         if (currentRegion && currentRegion.move === pt.move) { currentRegion.end = pt.t; } 
         else {
@@ -56,42 +56,63 @@ window.drawSensorGraph = function() {
     }
     if (currentRegion) regions.push(currentRegion);
 
+    // THE FIX: Analyze the live data to snap the dashed visual boundary perfectly!
+    for (let r of regions) {
+        if (r.move === 'IDLE' || r.move === 'END') continue;
+        let pts = telemetryHistory.filter(p => p.t >= r.start && p.t <= r.end);
+        
+        let lastActive = pts.findLast(p => Math.abs(p.left) > 0 || Math.abs(p.right) > 0);
+        if (lastActive) {
+            // Adds a tiny buffer so the line doesn't cut directly into the shape
+            r.visualEnd = Math.min(r.end, lastActive.t + 100);
+        } else {
+            // Failsafe: if the motor broke instantly, give it a tiny box so it's still visible
+            r.visualEnd = Math.min(r.end, r.start + 300);
+        }
+    }
+
     let displayRegions = regions.filter(r => r.move !== 'IDLE' && r.move !== 'END');
     let targetWidth = 900;
     if (displayRegions.length > 6) { targetWidth = leftPad + pad + (displayRegions.length * 130); }
     
     if (canvas.width !== targetWidth) canvas.width = targetWidth;
     else ctx.clearRect(0, 0, canvas.width, h);
-    
     const w = canvas.width;
 
     if (telemetryHistory.length === 0) {
-        ctx.fillStyle = '#888'; ctx.font = '16px Share Tech Mono'; ctx.textAlign = 'center';
+        ctx.fillStyle = '#888';
+        ctx.font = '16px Share Tech Mono'; ctx.textAlign = 'center';
         ctx.fillText("No data recorded yet. Execute Payload first.", w/2, h/2); return;
     }
     
     const maxT = Math.max(1, telemetryHistory[telemetryHistory.length - 1].t);
-    
     ctx.font = '12px Share Tech Mono'; ctx.textBaseline = 'middle'; ctx.textAlign = 'right';
     for (let speed = -100; speed <= 100; speed += 20) {
         const y = h/2 - (speed / 100) * (h/2 - pad);
         ctx.strokeStyle = speed === 0 ? '#444' : 'rgba(255, 255, 255, 0.1)'; ctx.lineWidth = speed === 0 ? 2 : 1;
         ctx.beginPath(); ctx.moveTo(leftPad, y); ctx.lineTo(w - pad, y); ctx.stroke();
-        ctx.fillStyle = speed === 0 ? '#fff' : '#888'; ctx.fillText(speed, leftPad - 10, y);
+        ctx.fillStyle = speed === 0 ? '#fff' : '#888';
+        ctx.fillText(speed, leftPad - 10, y);
     }
 
     ctx.font = '14px Share Tech Mono'; ctx.textBaseline = 'bottom'; ctx.textAlign = 'center';
-    for (let reg of regions) {
-        if (reg.move === 'IDLE' || reg.move === 'END') continue;
-        let startX = leftPad + (reg.start / maxT) * (w - leftPad - pad); let endX = leftPad + (reg.end / maxT) * (w - leftPad - pad);
+    
+    for (let reg of displayRegions) {
+        // THE FIX: Uses our new visualEnd to pull the dashed line tight!
+        let startX = leftPad + (reg.start / maxT) * (w - leftPad - pad);
+        let endX = leftPad + (reg.visualEnd / maxT) * (w - leftPad - pad);
 
         ctx.strokeStyle = '#555'; ctx.setLineDash([5, 5]);
-        ctx.beginPath(); ctx.moveTo(startX, pad); ctx.lineTo(startX, h - pad); ctx.moveTo(endX, pad); ctx.lineTo(endX, h - pad); ctx.stroke(); ctx.setLineDash([]);
-
+        ctx.beginPath();
+        ctx.moveTo(startX, pad); ctx.lineTo(startX, h - pad); 
+        ctx.moveTo(endX, pad); ctx.lineTo(endX, h - pad); 
+        ctx.stroke(); ctx.setLineDash([]);
+        
         let arrowY = pad / 2 + 15; ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)'; ctx.fillStyle = 'rgba(255, 255, 255, 0.6)'; ctx.lineWidth = 1;
 
         if (endX - startX > 30) {
-            ctx.beginPath(); ctx.moveTo(startX + 10, arrowY); ctx.lineTo(endX - 10, arrowY); ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(startX + 10, arrowY); ctx.lineTo(endX - 10, arrowY); ctx.stroke();
             ctx.beginPath(); ctx.moveTo(startX + 10, arrowY); ctx.lineTo(startX + 15, arrowY - 4); ctx.lineTo(startX + 15, arrowY + 4); ctx.fill();
             ctx.beginPath(); ctx.moveTo(endX - 10, arrowY); ctx.lineTo(endX - 15, arrowY - 4); ctx.lineTo(endX - 15, arrowY + 4); ctx.fill();
         }
@@ -101,39 +122,55 @@ window.drawSensorGraph = function() {
     if (graphMode === 'normal') {
         function getSimplifiedPoints(key) {
             let simplified = [];
-            for (let reg of regions) {
+            for (let reg of displayRegions) {
                 let pts = telemetryHistory.filter(p => p.t >= reg.start && p.t <= reg.end);
-                if (pts.length === 0) continue;
-                if (reg.move === 'IDLE' || reg.move === 'END') { simplified.push({ t: reg.start, val: 0 }); simplified.push({ t: reg.end, val: 0 }); continue; }
-
                 let isActive = false;
                 for (let p of pts) { let tgt = key === 'left' ? p.tgtLeft : p.tgtRight; if (tgt !== 0) { isActive = true; break; } }
                 
-                let amp = 0; if (isActive) { amp = (key === 'left') ? 100 : -100; }
-                let activeEnd = Math.max(reg.start + 100, reg.end - 500); let activeDuration = activeEnd - reg.start; let ramp = Math.min(200, activeDuration * 0.2);
+                let amp = 0;
+                if (isActive) { amp = (key === 'left') ? 100 : -100; }
+                
+                // THE FIX: Snaps the shape perfectly to the visualEnd boundary
+                let activeDuration = reg.visualEnd - reg.start; 
+                let ramp = Math.min(100, activeDuration * 0.2);
 
-                simplified.push({ t: reg.start, val: 0 }); simplified.push({ t: reg.start + ramp, val: amp });
-                simplified.push({ t: activeEnd - ramp, val: amp }); simplified.push({ t: activeEnd, val: 0 }); simplified.push({ t: reg.end, val: 0 });
+                simplified.push({ t: reg.start, val: 0 });
+                simplified.push({ t: reg.start + ramp, val: amp });
+                simplified.push({ t: reg.visualEnd - ramp, val: amp });
+                simplified.push({ t: reg.visualEnd, val: 0 }); 
             }
             return simplified;
         }
 
         function drawSimplifiedLine(key, color) {
-            const pts = getSimplifiedPoints(key); ctx.strokeStyle = color; ctx.lineWidth = 3; ctx.lineJoin = 'round'; ctx.beginPath();
+            const pts = getSimplifiedPoints(key);
+            ctx.strokeStyle = color; ctx.lineWidth = 3; ctx.lineJoin = 'round'; ctx.beginPath();
+            
+            let isFirst = true;
             for (let i = 0; i < pts.length; i++) {
-                const pt = pts[i]; const x = leftPad + (pt.t / maxT) * (w - leftPad - pad); const y = h/2 - (pt.val / 100) * (h/2 - pad);
-                if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+                const pt = pts[i];
+                const x = leftPad + (pt.t / maxT) * (w - leftPad - pad);
+                const y = h/2 - (pt.val / 100) * (h/2 - pad);
+                
+                // THE FIX: Automatically draws flatlines connecting the separated regions!
+                if (isFirst) { ctx.moveTo(leftPad, h/2); ctx.lineTo(x, y); isFirst = false; }
+                else { ctx.lineTo(x, y); }
             }
+            ctx.lineTo(w - pad, h/2);
             ctx.stroke();
         }
         drawSimplifiedLine('left', '#00ff41'); drawSimplifiedLine('right', '#00f0ff');
-        
     } else {
         function drawRawLine(key, color) {
-            ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.lineJoin = 'round'; ctx.beginPath();
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 2; ctx.lineJoin = 'round'; ctx.beginPath();
             for (let i = 0; i < telemetryHistory.length; i++) {
-                const pt = telemetryHistory[i]; const x = leftPad + (pt.t / maxT) * (w - leftPad - pad); const yOffset = (key === 'right') ? 4 : 0; const y = h/2 - (pt[key] / 100) * (h/2 - pad) + yOffset;
-                if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+                const pt = telemetryHistory[i];
+                const x = leftPad + (pt.t / maxT) * (w - leftPad - pad);
+                const yOffset = (key === 'right') ? 4 : 0;
+                const y = h/2 - (pt[key] / 100) * (h/2 - pad) + yOffset;
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
             }
             ctx.stroke();
         }

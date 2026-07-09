@@ -22,6 +22,18 @@ window.clearAnimTimeouts = function() {
 
 window.p1_flicker = null; window.p1_spray = null; window.p2_flicker = null;
 
+window.triggerBootSequence = function() {
+    setTimeout(() => {
+        const loader = document.getElementById('loading-screen');
+        if (loader) {
+            loader.classList.add('fade-out');
+            setTimeout(() => {
+                window.openHelp();
+            }, 800);
+        }
+    }, 3000); 
+};
+
 window.doTransition = function(callback, event) {
     const wipe = document.getElementById('transition-wipe');
     if (event) { document.documentElement.style.setProperty('--wipe-x', event.clientX + 'px'); document.documentElement.style.setProperty('--wipe-y', event.clientY + 'px'); } 
@@ -35,7 +47,8 @@ window.captureState = function() {
     let state = [];
     const moves = document.getElementById('move-listbox').children;
     for(let i=0; i<moves.length; i++) {
-        state.push({ id: 'MOVE_' + i, moveId: moves[i].getAttribute('data-move-id'), label: `Instruction [${i}]`, value: moves[i].innerText.trim().toUpperCase() });
+        // THE FIX: Shifted the label indexing to i + 1
+        state.push({ id: 'MOVE_' + i, moveId: moves[i].getAttribute('data-move-id'), label: `Instruction [${i + 1}]`, value: moves[i].innerText.trim().toUpperCase() });
     }
     const settingsMap = [
         { id: 'FWD_SPD', el: 'fwd_spd', label: 'Forward Speed' }, { id: 'BCK_SPD', el: 'bck_spd', label: 'Backward Speed' },
@@ -315,6 +328,19 @@ function buildAlignment() {
     }
 }
 
+window.getOriginalInstructionLabel = function(moveId) {
+    if (!programmerState) return "[ UNKNOWN ]";
+    
+    let pMoves = programmerState.filter(x => x.id.startsWith('MOVE_'));
+    for (let i = 0; i < pMoves.length; i++) {
+        if (pMoves[i].moveId === String(moveId)) {
+            // THE FIX: Shifted the visual label indexing to i + 1
+            return `Instr [${i + 1}]`; 
+        }
+    }
+    return "[ UNKNOWN ]";
+};
+
 window.currentHelpStep = 1;
 window.TOTAL_HELP_STEPS = 7;
 
@@ -390,5 +416,3 @@ document.addEventListener('keydown', function(event) {
         }
     }
 });
-
-// REMOVED DOMContentLoaded LISTENER FROM HERE
