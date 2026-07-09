@@ -9,10 +9,10 @@
     <script type="module" src="https://pyscript.net/releases/2023.11.1/core.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
     
-    <link rel="stylesheet" href="core.css?v=37.0">
-    <link rel="stylesheet" href="terminal.css?v=37.0">
-    <link rel="stylesheet" href="modals.css?v=37.0">
-    <link rel="stylesheet" href="cinematic.css?v=37.0">
+    <link rel="stylesheet" href="core.css?v=40.0">
+    <link rel="stylesheet" href="terminal.css?v=40.0">
+    <link rel="stylesheet" href="module.css?v=40.0">
+    <link rel="stylesheet" href="cinematic.css?v=40.0">
 </head>
 <body>
 
@@ -146,10 +146,15 @@
     <div id="deduction-overlay" class="modal-overlay" style="display: none; z-index: 250;">
         <div class="modal-content" style="max-width: 900px;">
             <h2 style="text-align: center; color: var(--neon-cyan); margin-top: 0; text-shadow: 0 0 10px rgba(0,240,255,0.4);">[ INCIDENT REPORT ]</h2>
-            <div id="deduction-list" style="overflow-y: auto; max-height: 50vh; display: flex; flex-direction: column; gap: 10px; padding-right: 10px; margin-top: 15px;"></div>
+            
+            <div class="analysis-guide" style="margin-top: 0; margin-bottom: 15px;">
+                <strong>HOW TO PLAY:</strong> Review the memory audit and sensor graph to find the Hacker's modifications and broken motors. Mark each row as <strong style="color: var(--neon-green);">VALID</strong> (Safe), <strong style="color: var(--neon-red);">BREACHED</strong> (Hacked), or <strong style="color: #ff9d00;">BROKEN</strong> (Mechanical Failure).
+            </div>
+            
+            <div id="deduction-list" style="overflow-y: auto; max-height: 50vh; display: flex; flex-direction: column; gap: 10px; padding-right: 10px;"></div>
             <div style="display: flex; gap: 15px; margin-top: 25px;">
                 <button onclick="window.closeDeduction()" class="btn-success" style="flex: 1; border-color: var(--neon-cyan); color: var(--neon-cyan); background: rgba(0, 240, 255, 0.05);">Wait, Let Me Check</button>
-                <button onclick="window.submitDeduction()" class="btn-success" style="flex: 2; border-color: var(--neon-green); color: var(--neon-green); background: rgba(0, 255, 65, 0.05);">Submit Final Report</button>
+                <button id="btn-submit-report" onclick="window.submitDeduction()" class="btn-success" style="flex: 2; border-color: var(--neon-green); color: var(--neon-green); background: rgba(0, 255, 65, 0.05); opacity: 0.5;" disabled>Submit Final Report</button>
             </div>
         </div>
     </div>
@@ -192,7 +197,7 @@
     
     <div class="container" id="phase2-container">
         <div id="hacker-bash">
-            <div class="bash-header">root@sys:~/frc_telemetry/payload_injection</div>
+            <div class="bash-header">root@sys:~/payload_injection</div>
             <div class="bash-body">
                 <div class="bash-logs" id="bash-logs">
                     <span style="color: #888;">[ SYSTEM ] Establishing Secure Shell...</span>
@@ -311,16 +316,16 @@
         ACTIVE HARDWARE LINK: <span id="hardware-id" style="color: var(--neon-red); font-weight: bold;">DISCONNECTED</span>
     </div>
 
-    <script src="matrix.js?v=37.0"></script>
-    <script src="state.js?v=37.0"></script>
-    <script src="terminal.js?v=37.0"></script>
-    <script src="checksum.js?v=37.0"></script>
-    <script src="sensor.js?v=37.0"></script>
-    <script src="deduction.js?v=37.0"></script>
-    <script src="dragdrop.js?v=37.0"></script>
+    <script src="matrix.js?v=40.0"></script>
+    <script src="state.js?v=40.0"></script>
+    <script src="terminal.js?v=40.0"></script>
+    <script src="checksum.js?v=40.0"></script>
+    <script src="sensor.js?v=40.0"></script>
+    <script src="deduction.js?v=40.0"></script>
+    <script src="dragdrop.js?v=40.0"></script>
 
-    <script src="bluetooth.js?v=37.0"></script>
-    <script type="py" src="app.py?v=37.0"></script>
+    <script src="bluetooth.js?v=40.0"></script>
+    <script type="py" src="app.py?v=40.0"></script>
 
 </body>
 </html>

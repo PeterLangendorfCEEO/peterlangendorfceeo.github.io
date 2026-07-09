@@ -2,6 +2,13 @@ window.openDeduction = function() {
     document.getElementById('deduction-overlay').style.display = 'flex';
     const container = document.getElementById('deduction-list');
     
+    // THE FIX: Reset and Disable Submit button on open
+    const submitBtn = document.getElementById('btn-submit-report');
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.style.opacity = '0.5';
+    }
+    
     if (container.children.length === 0) {
         deductionState = [];
         let moveIndex = 0;
@@ -12,18 +19,9 @@ window.openDeduction = function() {
             let isMove = pair.isMove;
             let displayValue = "?????";
             let displayLabel = "Unknown";
-            // A "virtual" rItem is a blank stand-in for a deleted move -
-            // it was never actually executed by the robot, so it shouldn't
-            // count as a real move for motor-failure purposes.
             let isRealRobotMove = isMove && pair.rItem && !pair.rItem.virtual;
             
             if (isMove) {
-                // Always use a single, live counter for the label -- never
-                // pair.pItem.label. That field is a snapshot of this move's
-                // position back in Phase 1, which has nothing to do with
-                // where it ends up in the aligned audit list, and mixing
-                // the two numbering schemes produces duplicate labels
-                // (e.g. two different rows both showing "Instruction [0]").
                 displayLabel = `Instruction [${moveIndex}]`;
                 moveIndex++;
                 if (pair.pItem) { displayValue = pair.pItem.value; }
@@ -66,6 +64,22 @@ window.toggleDeduct = function(index, type) {
     
     let broBtn = document.getElementById(`btn-bro-${index}`);
     if (broBtn) { broBtn.className = 'btn-deduct' + (state.broken ? ' active-broken' : ''); }
+
+    // THE FIX: Validation Loop. Checks if EVERY row has at least one button selected
+    let allSelected = true;
+    for (let i = 0; i < deductionState.length; i++) {
+        if (!deductionState[i].valid && !deductionState[i].breached && !deductionState[i].broken) {
+            allSelected = false;
+            break;
+        }
+    }
+    
+    // THE FIX: Enables the Submit button only if validation passes
+    const submitBtn = document.getElementById('btn-submit-report');
+    if (submitBtn) {
+        submitBtn.disabled = !allSelected;
+        submitBtn.style.opacity = allSelected ? '1' : '0.5';
+    }
 }
 
 window.submitDeduction = function() {
@@ -83,10 +97,6 @@ window.submitDeduction = function() {
         
         if (pair.isMove) {
             label = pair.pItem ? pair.pItem.label : "Inserted Code";
-            // Unified rule: breached whenever what the programmer wrote
-            // doesn't match what's actually in robot memory at that slot.
-            // This naturally covers inserted code (no pItem), deleted code
-            // (blank virtual rItem), and replaced code (mismatched values).
             let pVal = pair.pItem ? pair.pItem.value : undefined;
             let rVal = pair.rItem ? pair.rItem.value : undefined;
             trueBreached = (pVal !== rVal);

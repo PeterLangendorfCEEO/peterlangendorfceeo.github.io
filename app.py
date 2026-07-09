@@ -45,11 +45,6 @@ def add_move(move):
     item.className = "list-item"
     item.draggable = True
     item.innerText = move.lower()
-    # Give this specific move instance a permanent, unique identity.
-    # This is what lets the checksum/deduction rounds tell the difference
-    # between "this exact instruction moved" vs "this instruction was
-    # deleted and a different one was inserted", even when two moves
-    # share the same value (e.g. two "forward"s).
     item.setAttribute("data-move-id", str(move_id_counter))
     move_id_counter += 1
     listbox.appendChild(item)
@@ -71,11 +66,23 @@ async def connect_motor(event):
     global is_connected
     print_term("Triggering Web Bluetooth Pairing Menu...", color="yellow")
     
+    # THE FIX: Button shifts to CONNECTING... before we wait for the hardware API
+    btn_connect = document.querySelector("#btn-connect")
+    btn_connect.innerText = "CONNECTING..."
+    btn_connect.setAttribute("disabled", "true")
+    btn_connect.setAttribute("style", "color: var(--neon-cyan) !important; border-color: var(--neon-cyan) !important; opacity: 0.8 !important;")
+    
     device_name = await window.legoBluetooth.connectHub()
     
     if not device_name or device_name == False:
         print_term("Connection failed or cancelled.", color="red")
         is_connected = False
+        
+        # Restore button state if the user hits cancel
+        btn_connect.innerText = "Connect Motor via Bluetooth"
+        btn_connect.removeAttribute("disabled")
+        btn_connect.removeAttribute("style")
+        
         document.querySelector("#btn-begin").setAttribute("disabled", "true")
         return
 
@@ -85,9 +92,10 @@ async def connect_motor(event):
     await asyncio.sleep(1)
 
     document.querySelector("#btn-begin").removeAttribute("disabled")
-    btn_connect = document.querySelector("#btn-connect")
-    btn_connect.setAttribute("disabled", "true")
+    
+    # THE FIX: Drops opacity to 0.5 once the handshake is fully locked in
     btn_connect.innerText = "CONNECTED"
+    btn_connect.setAttribute("style", "margin-top: 0; color: var(--neon-cyan) !important; border-color: var(--neon-cyan) !important; opacity: 0.5 !important; background: rgba(0, 240, 255, 0.1) !important;")
     
     hw_id = document.getElementById("hardware-id")
     if hw_id:
@@ -99,7 +107,12 @@ async def run_sequence(event):
         update_status()
         return
 
-    document.querySelector("#btn-begin").setAttribute("disabled", "true")
+    btn_begin = document.querySelector("#btn-begin")
+    btn_begin.setAttribute("disabled", "true")
+    
+    btn_begin.innerText = "EXECUTING..."
+    btn_begin.setAttribute("style", "color: var(--neon-cyan) !important; border-color: var(--neon-cyan) !important; opacity: 0.8 !important; background: transparent !important;")
+
     if document.querySelector("#btn-diagnostics"): document.querySelector("#btn-diagnostics").setAttribute("disabled", "true")
     if document.querySelector("#btn-sensors"): document.querySelector("#btn-sensors").setAttribute("disabled", "true")
     if document.querySelector("#btn-deduction"): document.querySelector("#btn-deduction").setAttribute("disabled", "true")
@@ -215,7 +228,6 @@ async def run_sequence(event):
         except Exception as e:
             print_term(f"Command failed or timed out: {e}", color="red")
 
-        # THE FIX: Guarantee a half-second flatline between EVERY instruction so the graph separates!
         window.currentMoveLabel = "IDLE"
         if hasattr(window, 'setCurrentTargetSpeeds'): window.setCurrentTargetSpeeds(0, 0)
         await asyncio.sleep(0.5)
@@ -224,6 +236,10 @@ async def run_sequence(event):
     if hasattr(window, 'setCurrentTargetSpeeds'): window.setCurrentTargetSpeeds(0, 0)
     if hasattr(window, 'stopRecording'): window.stopRecording()
     print_term("Robot move sequence complete!")
+    
+    # THE FIX: Drops opacity to 0.5 once the entire payload finishes executing
+    btn_begin.innerText = "EXECUTED"
+    btn_begin.setAttribute("style", "color: var(--neon-cyan) !important; border-color: var(--neon-cyan) !important; opacity: 0.5 !important; background: rgba(0, 240, 255, 0.1) !important;")
     
     if document.querySelector("#btn-diagnostics"): document.querySelector("#btn-diagnostics").removeAttribute("disabled")
     if document.querySelector("#btn-sensors"): document.querySelector("#btn-sensors").removeAttribute("disabled")
