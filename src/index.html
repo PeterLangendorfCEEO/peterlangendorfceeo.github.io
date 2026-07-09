@@ -4,15 +4,16 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Buggy, Broken, or Breached!</title>
+    <link rel="icon" type="image/ico" href="resources/favicon.ico">
     
     <link rel="stylesheet" href="https://pyscript.net/releases/2023.11.1/core.css" />
     <script type="module" src="https://pyscript.net/releases/2023.11.1/core.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
     
-    <link rel="stylesheet" href="core.css?v=50.0">
-    <link rel="stylesheet" href="terminal.css?v=50.0">
-    <link rel="stylesheet" href="module.css?v=50.0">
-    <link rel="stylesheet" href="cinematic.css?v=50.0">
+    <link rel="stylesheet" href="css/core.css">
+    <link rel="stylesheet" href="css/terminal.css">
+    <link rel="stylesheet" href="css/module.css">
+    <link rel="stylesheet" href="css/cinematic.css">
 </head>
 <body>
 
@@ -102,7 +103,7 @@
                 <div class="binary-row">01110100 01100001 01101110 00100000 00110001 00110001 00110111 00000000 01110100 01100001</div>
             </div>
 
-            <img class="cinematic-packet" id="h-packet" src="packet.png" alt="DATA">
+            <img class="cinematic-packet" id="h-packet" src="resources/packet.png" alt="DATA">
 
             <div class="cinematic-hacker" id="h-hacker">
                 <svg width="120" height="120" viewBox="0 0 16 16" shape-rendering="crispEdges">
@@ -145,7 +146,7 @@
                 <div class="binary-row red">10110010 11010111 00110101 10001010 11110000 00101101 11001011 01010100 11100011 10101010</div>
                 <div class="binary-row red">11101001 10111100 01101011 11000111 01010101 10011010 11011011 00010101 10111100 01100110</div>
                 <div class="binary-row red">10010101 11010011 00101010 11101101 01110011 10101010 11001100 01011101 11101100 00101010</div>
-                <img class="cinematic-packet" id="d-packet" src="packet.png" alt="DATA" style="filter: drop-shadow(0 0 20px #ff003c) sepia(1) hue-rotate(-50deg) saturate(5);">
+                <img class="cinematic-packet" id="d-packet" src="resources/packet.png" alt="DATA" style="filter: drop-shadow(0 0 20px #ff003c) sepia(1) hue-rotate(-50deg) saturate(5);">
             </div>
 
             <div class="cinematic-bot" id="d-bot">
@@ -372,17 +373,17 @@
         ACTIVE HARDWARE LINK: <span id="hardware-id" style="color: var(--neon-red); font-weight: bold;">DISCONNECTED</span>
     </div>
 
-    <script src="matrix.js?v=50.0"></script>
-    <script src="state.js?v=50.0"></script>
-    <script src="terminal.js?v=50.0"></script>
-    <script src="checksum.js?v=50.0"></script>
-    <script src="sensor.js?v=50.0"></script>
-    <script src="score.js?v=50.0"></script>
-    <script src="deduction.js?v=50.0"></script>
-    <script src="dragdrop.js?v=50.0"></script>
+    <script src="js/matrix.js"></script>
+    <script src="js/state.js"></script>
+    <script src="js/terminal.js"></script>
+    <script src="js/checksum.js"></script>
+    <script src="js/sensor.js"></script>
+    <script src="js/score.js"></script>
+    <script src="js/deduction.js"></script>
+    <script src="js/dragdrop.js"></script>
 
-    <script src="bluetooth.js?v=50.0"></script>
-    <script type="py" src="app.py?v=50.0"></script>
+    <script src="js/bluetooth.js"></script>
+    <script type="py" src="app.py"></script>
 
 </body>
 </html>
