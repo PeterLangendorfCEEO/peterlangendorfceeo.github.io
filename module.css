@@ -14,13 +14,10 @@
 .hash-text { color: #888; font-size: 0.9em; }
 .match-success .hash-text { color: var(--neon-green); font-weight: bold; }
 .match-fail .hash-text { color: var(--neon-red); font-weight: bold; }
-
-/* --- THE FIX: NEW CSS OVERRIDES FOR MODAL FLASHING --- */
 #checksum-overlay.flash-success .modal-content { border-color: var(--neon-green); box-shadow: 0 0 50px rgba(0, 255, 65, 0.6); }
 #checksum-overlay.flash-success h2, #checksum-overlay.flash-success h3, #checksum-overlay.flash-success .analysis-guide strong { color: var(--neon-green) !important; text-shadow: 0 0 10px var(--neon-green); border-color: var(--neon-green) !important; }
 #checksum-overlay.flash-fail .modal-content { border-color: var(--neon-red); box-shadow: 0 0 50px rgba(255, 0, 60, 0.6); }
 #checksum-overlay.flash-fail h2, #checksum-overlay.flash-fail h3, #checksum-overlay.flash-fail .analysis-guide strong { color: var(--neon-red) !important; text-shadow: 0 0 10px var(--neon-red); border-color: var(--neon-red) !important; }
-
 .canvas-container { width: 100%; overflow-x: auto; overflow-y: hidden; background: #000; border: 1px solid var(--border-color); border-radius: 4px; box-shadow: inset 0 0 15px rgba(0, 0, 0, 0.8); margin-top: 15px; }
 .canvas-container::-webkit-scrollbar { height: 8px; }
 .canvas-container::-webkit-scrollbar-track { background: #000; }
@@ -44,3 +41,10 @@
 .programmer-win { color: #fff; animation: textReveal 0.5s ease-out forwards, cyberPulse 2s linear infinite 0.5s; }
 @keyframes textReveal { 0% { opacity: 0; transform: translateY(20px) scale(0.9); letter-spacing: -5px; filter: blur(5px); } 100% { opacity: 1; transform: translateY(0) scale(1); letter-spacing: normal; filter: blur(0); } }
 @keyframes cyberPulse { 0%, 100% { text-shadow: 0 0 10px #00ff41, 0 0 20px #00ff41, 0 0 40px #00ff41; color: #fff; } 50% { text-shadow: 0 0 20px #00ff41, 0 0 40px #00ff41, 0 0 80px #00ff41; color: #ccffcc; } }
+
+/* --- THE FIX: NEW HELP MENU UI STYLING --- */
+.help-arrow { background: transparent; border: none; color: #888; font-size: 2.5em; cursor: pointer; transition: 0.2s; padding: 0 15px; }
+.help-arrow:hover:not(:disabled) { color: var(--neon-cyan); text-shadow: 0 0 15px var(--neon-cyan); }
+.help-arrow:disabled { color: #333; cursor: not-allowed; }
+.help-dot { width: 14px; height: 14px; border-radius: 50%; background: #444; transition: 0.3s; }
+.help-dot.active { background: #0088ff; box-shadow: 0 0 15px #0088ff; }
