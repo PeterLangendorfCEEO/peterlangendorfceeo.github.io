@@ -9,10 +9,10 @@
     <script type="module" src="https://pyscript.net/releases/2023.11.1/core.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
     
-    <link rel="stylesheet" href="core.css?v=40.0">
-    <link rel="stylesheet" href="terminal.css?v=40.0">
-    <link rel="stylesheet" href="module.css?v=40.0">
-    <link rel="stylesheet" href="cinematic.css?v=40.0">
+    <link rel="stylesheet" href="core.css?v=43.0">
+    <link rel="stylesheet" href="terminal.css?v=43.0">
+    <link rel="stylesheet" href="module.css?v=43.0">
+    <link rel="stylesheet" href="cinematic.css?v=43.0">
 </head>
 <body>
 
@@ -101,21 +101,36 @@
     </div>
 
     <div id="checksum-overlay" class="modal-overlay" style="display: none;">
-        <div class="modal-content">
+        <div class="modal-content" style="max-width: 850px;">
             <h2 style="text-align: center; color: var(--neon-cyan); margin-top: 0; text-shadow: 0 0 10px rgba(0,240,255,0.4);">[ SECURE MEMORY AUDIT ]</h2>
             <h3 id="checks-counter" style="text-align: center; color: var(--neon-cyan); margin-top: -5px; margin-bottom: 15px; border: 1px solid var(--neon-cyan); padding: 5px 15px; width: max-content; margin-left: auto; margin-right: auto; border-radius: 4px;">CHECKS REMAINING: 3</h3>
             
-            <div class="analysis-guide" style="margin-top: 0; margin-bottom: 15px;">
-                <strong>HOW TO PLAY:</strong> You have 3 tries to see if the Hacker changed your code! Click a block on the left, then click the matching block on the right. If it turns <span style="color: var(--neon-green); font-weight: bold;">GREEN</span>, it is safe. If it says <span style="color: var(--neon-red); font-weight: bold;">MISMATCH</span>, you clicked the wrong pair. If it says <span style="color: var(--neon-red); font-weight: bold;">BREACHED</span>, the Hacker changed it!
+            <div id="checksum-list-view">
+                <div class="analysis-guide" style="margin-top: 0; margin-bottom: 15px;">
+                    <strong>HOW TO PLAY:</strong> Click an original memory block to audit its cryptographic hash against the live robot. You only have 3 checks! If the hashes match, the block is <strong style="color: var(--neon-green);">VERIFIED</strong>. If they differ, the block was <strong style="color: var(--neon-red);">BREACHED</strong>.
+                </div>
+                <div id="checksum-blocks" style="display: flex; flex-direction: column; gap: 10px; max-height: 45vh; overflow-y: auto; padding-right: 10px;"></div>
+            </div>
+
+            <div id="checksum-anim-view" style="display: none; flex-direction: column; align-items: center; justify-content: center; padding: 30px 0;">
+                <div style="display: flex; justify-content: space-between; width: 100%; align-items: center; margin-bottom: 30px;">
+                    <div style="text-align: center; flex: 1;">
+                        <h4 style="color: #aaa; margin-bottom: 10px;">PROGRAMMER INPUT</h4>
+                        <div id="anim-p-val" style="font-size: 1.5em; color: var(--text-main); margin-bottom: 10px;">FORWARD</div>
+                        <div id="anim-p-hash" style="font-size: 2em; color: var(--neon-cyan); font-weight: bold; letter-spacing: 2px;">0x00000000</div>
+                    </div>
+                    <div style="font-size: 2.5em; color: #555; font-weight: bold; padding: 0 20px;">VS</div>
+                    <div style="text-align: center; flex: 1;">
+                        <h4 style="color: #aaa; margin-bottom: 10px;">ROBOT MEMORY</h4>
+                        <div id="anim-r-val" style="font-size: 1.5em; color: var(--text-main); margin-bottom: 10px;">?????</div>
+                        <div id="anim-r-hash" style="font-size: 2em; color: var(--neon-red); font-weight: bold; letter-spacing: 2px;">0x00000000</div>
+                    </div>
+                </div>
+                <div id="anim-result" style="font-size: 2.5em; font-weight: bold; height: 50px; margin-bottom: 20px; text-transform: uppercase;"></div>
+                <button id="btn-anim-back" onclick="window.backToChecksumList()" class="btn-success" style="width: 50%; opacity: 0; pointer-events: none; transition: opacity 0.5s;">RETURN TO LIST</button>
             </div>
             
-            <div class="checksum-grid">
-                <div class="checksum-header-left">Original Programmer Inputs</div>
-                <div></div>
-                <div class="checksum-header-right">Live Robot Memory Array</div>
-            </div>
-            
-            <button onclick="window.closeChecksum()" class="btn-success" style="margin-top: 25px; align-self: center; width: 50%;">Close Diagnostics</button>
+            <button id="btn-close-diagnostics" onclick="window.closeChecksum()" class="btn-success" style="margin-top: 25px; align-self: center; width: 50%;">Close Diagnostics</button>
         </div>
     </div>
 
@@ -184,6 +199,7 @@
                 <div class="btn-grid no-margin" style="margin-top: 15px;">
                     <button id="btn-remove">Delete Selected</button>
                     <button id="btn-clear">Clear All</button>
+                    <button id="btn-undo" onclick="window.undoHackerAction()" style="display:none; border-color: #ff9d00; color: #ff9d00; transition: all 0.2s;">Undo Edit</button>
                 </div>
             </div>
             
@@ -216,64 +232,32 @@
                             
                             <div class="setting-row">
                                 <span style="width: 140px; text-align: left;">FORWARD_SPEED:</span>
-                                <select id="fwd_spd">
-                                    <option value="0">0</option>
-                                    <option value="25">25</option>
-                                    <option value="50">50</option>
-                                    <option value="75">75</option>
-                                    <option value="100" selected>100</option>
-                                </select>
+                                <select id="fwd_spd"><option value="0">0</option><option value="25">25</option><option value="50">50</option><option value="75">75</option><option value="100" selected>100</option></select>
                             </div>
                             
                             <div class="setting-row">
                                 <span style="width: 140px; text-align: left;">BACKWARD_SPEED:</span>
-                                <select id="bck_spd">
-                                    <option value="0">0</option>
-                                    <option value="25">25</option>
-                                    <option value="50">50</option>
-                                    <option value="75">75</option>
-                                    <option value="100" selected>100</option>
-                                </select>
+                                <select id="bck_spd"><option value="0">0</option><option value="25">25</option><option value="50">50</option><option value="75">75</option><option value="100" selected>100</option></select>
                             </div>
                             
                             <div class="setting-row">
                                 <span style="width: 140px; text-align: left;">RIGHT_SPEED:</span>
-                                <select id="rgt_spd">
-                                    <option value="0">0</option>
-                                    <option value="3">3</option>
-                                    <option value="7">7</option>
-                                    <option value="10" selected>10</option>
-                                </select>
+                                <select id="rgt_spd"><option value="0">0</option><option value="3">3</option><option value="7">7</option><option value="10" selected>10</option></select>
                             </div>
                             
                             <div class="setting-row">
                                 <span style="width: 140px; text-align: left;">RIGHT_ANGLE:</span>
-                                <select id="rgt_ang">
-                                    <option value="0">0</option>
-                                    <option value="45">45</option>
-                                    <option value="90" selected>90</option>
-                                    <option value="180">180</option>
-                                </select>
+                                <select id="rgt_ang"><option value="0">0</option><option value="45">45</option><option value="90" selected>90</option><option value="180">180</option></select>
                             </div>
                             
                             <div class="setting-row">
                                 <span style="width: 140px; text-align: left;">LEFT_SPEED:</span>
-                                <select id="lft_spd">
-                                    <option value="0">0</option>
-                                    <option value="3">3</option>
-                                    <option value="7">7</option>
-                                    <option value="10" selected>10</option>
-                                </select>
+                                <select id="lft_spd"><option value="0">0</option><option value="3">3</option><option value="7">7</option><option value="10" selected>10</option></select>
                             </div>
                             
                             <div class="setting-row">
                                 <span style="width: 140px; text-align: left;">LEFT_ANGLE:</span>
-                                <select id="lft_ang">
-                                    <option value="0">0</option>
-                                    <option value="-45">-45</option>
-                                    <option value="-90" selected>-90</option>
-                                    <option value="-180">-180</option>
-                                </select>
+                                <select id="lft_ang"><option value="0">0</option><option value="-45">-45</option><option value="-90" selected>-90</option><option value="-180">-180</option></select>
                             </div>
 
                         </div>
@@ -316,16 +300,16 @@
         ACTIVE HARDWARE LINK: <span id="hardware-id" style="color: var(--neon-red); font-weight: bold;">DISCONNECTED</span>
     </div>
 
-    <script src="matrix.js?v=40.0"></script>
-    <script src="state.js?v=40.0"></script>
-    <script src="terminal.js?v=40.0"></script>
-    <script src="checksum.js?v=40.0"></script>
-    <script src="sensor.js?v=40.0"></script>
-    <script src="deduction.js?v=40.0"></script>
-    <script src="dragdrop.js?v=40.0"></script>
+    <script src="matrix.js?v=43.0"></script>
+    <script src="state.js?v=43.0"></script>
+    <script src="terminal.js?v=43.0"></script>
+    <script src="checksum.js?v=43.0"></script>
+    <script src="sensor.js?v=43.0"></script>
+    <script src="deduction.js?v=43.0"></script>
+    <script src="dragdrop.js?v=43.0"></script>
 
-    <script src="bluetooth.js?v=40.0"></script>
-    <script type="py" src="app.py?v=40.0"></script>
+    <script src="bluetooth.js?v=43.0"></script>
+    <script type="py" src="app.py?v=43.0"></script>
 
 </body>
 </html>

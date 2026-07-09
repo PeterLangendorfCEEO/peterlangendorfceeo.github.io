@@ -41,22 +41,24 @@ function processTypingQueue() {
 const settingsInputs = ['fwd_spd', 'rgt_spd', 'rgt_ang', 'lft_spd', 'lft_ang', 'bck_spd'];
 settingsInputs.forEach(id => {
     const el = document.getElementById(id);
-    if (el) { el.addEventListener('change', (e) => { window.logHackerAction(`env.ovr !key=${id} !val=${e.target.value}`); }); }
+    if (el) { 
+        el.addEventListener('focus', () => { if (currentPhase === 2) window.saveHackerState(); });
+        el.addEventListener('change', (e) => { window.logHackerAction(`env.ovr !key=${id} !val=${e.target.value}`); }); 
+    }
 });
 
 var isDraggingMove = false; 
 var previousOrder = [];     
 const listbox = document.getElementById('move-listbox');
 
-// THE FIX: Sync settings immediately if listbox loads, and on every mutation
 if (window.syncSettings) window.syncSettings();
 
 const observer = new MutationObserver((mutations) => {
-    
-    if (window.syncSettings) window.syncSettings(); // Updates dropdown locks!
-    
+    if (window.syncSettings) window.syncSettings(); 
     if (currentPhase !== 2) return;
-    if (isDraggingMove) return; 
+    
+    // THE FIX: Ignore mutations if an undo command is currently firing!
+    if (isDraggingMove || window.isUndoing) return; 
 
     mutations.forEach(mutation => {
         if (mutation.type === 'childList') {

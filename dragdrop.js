@@ -1,6 +1,17 @@
 if (listbox) {
-    document.addEventListener('click', (e) => { if (!e.target.closest('#move-listbox') && !e.target.closest('#btn-remove')) { document.querySelectorAll('.list-item.selected').forEach(el => el.classList.remove('selected')); } });
-    listbox.addEventListener('click', (e) => { if (e.target.classList.contains('list-item')) { document.querySelectorAll('.list-item.selected').forEach(el => el.classList.remove('selected')); e.target.classList.add('selected'); } });
+    document.addEventListener('click', (e) => { 
+        if (!e.target.closest('#move-listbox') && !e.target.closest('#btn-remove') && !e.target.closest('.btn-grid')) { 
+            document.querySelectorAll('.list-item.selected').forEach(el => el.classList.remove('selected')); 
+            if (window.syncHackerButtons) window.syncHackerButtons(); // THE FIX: Re-greys buttons if clicked off
+        } 
+    });
+    listbox.addEventListener('click', (e) => { 
+        if (e.target.classList.contains('list-item')) { 
+            document.querySelectorAll('.list-item.selected').forEach(el => el.classList.remove('selected')); 
+            e.target.classList.add('selected'); 
+            if (window.syncHackerButtons) window.syncHackerButtons(); // THE FIX: Enables buttons on selection
+        } 
+    });
     listbox.addEventListener('dragstart', (e) => { 
         if(e.target.classList.contains('list-item')) { 
             isDraggingMove = true; previousOrder = Array.from(listbox.children).map(c => c.innerText);
@@ -17,16 +28,18 @@ if (listbox) {
         } 
     });
     listbox.addEventListener('dragover', (e) => {
+        if (currentPhase === 2) return;
         e.preventDefault();
         const afterElement = getDragAfterElement(listbox, e.clientY);
         const currentDraggable = document.querySelector('.dragging');
         if (currentDraggable) { if (afterElement == null) { listbox.appendChild(currentDraggable); } else { listbox.insertBefore(currentDraggable, afterElement); } }
     });
 }
+
 function getDragAfterElement(container, y) {
     const draggableElements = [...container.querySelectorAll('.list-item:not(.dragging)')];
     return draggableElements.reduce((closest, child) => {
         const box = child.getBoundingClientRect(); const offset = y - box.top - box.height / 2;
-        if (offset < 0 && offset > closest.offset) { return { offset: offset, element: child }; } else { return closest; }
+        if (offset < 0 && offset > closest.offset) { return { offset: offset, element: child } } else { return closest }
     }, { offset: Number.NEGATIVE_INFINITY }).element;
 }

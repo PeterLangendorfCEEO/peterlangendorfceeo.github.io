@@ -2,12 +2,8 @@ window.openDeduction = function() {
     document.getElementById('deduction-overlay').style.display = 'flex';
     const container = document.getElementById('deduction-list');
     
-    // THE FIX: Reset and Disable Submit button on open
     const submitBtn = document.getElementById('btn-submit-report');
-    if (submitBtn) {
-        submitBtn.disabled = true;
-        submitBtn.style.opacity = '0.5';
-    }
+    if (submitBtn) { submitBtn.disabled = true; submitBtn.style.opacity = '0.5'; }
     
     if (container.children.length === 0) {
         deductionState = [];
@@ -17,19 +13,12 @@ window.openDeduction = function() {
             deductionState.push({ valid: false, breached: false, broken: false });
             
             let isMove = pair.isMove;
-            let displayValue = "?????";
+            let displayValue = pair.pItem ? pair.pItem.value : "Unknown";
             let displayLabel = "Unknown";
-            let isRealRobotMove = isMove && pair.rItem && !pair.rItem.virtual;
+            let isRealRobotMove = isMove && !pair.rItem.virtual;
             
-            if (isMove) {
-                displayLabel = `Instruction [${moveIndex}]`;
-                moveIndex++;
-                if (pair.pItem) { displayValue = pair.pItem.value; }
-                else { displayValue = pair.rItem.value; }
-            } else {
-                if (pair.pItem) { displayValue = pair.pItem.value; displayLabel = pair.pItem.label; }
-                else { displayValue = pair.rItem.value; }
-            }
+            if (isMove) { displayLabel = `Instruction [${moveIndex}]`; moveIndex++; } 
+            else { displayLabel = pair.pItem.label; }
             
             let div = document.createElement('div');
             div.className = 'deduction-row';
@@ -53,9 +42,7 @@ window.closeDeduction = function() { document.getElementById('deduction-overlay'
 window.toggleDeduct = function(index, type) {
     let state = deductionState[index];
     
-    if (type === 'valid') {
-        if (!state.valid) { state.valid = true; state.breached = false; state.broken = false; } else { state.valid = false; }
-    } 
+    if (type === 'valid') { if (!state.valid) { state.valid = true; state.breached = false; state.broken = false; } else { state.valid = false; } } 
     else if (type === 'breached') { state.breached = !state.breached; if (state.breached) state.valid = false; } 
     else if (type === 'broken') { state.broken = !state.broken; if (state.broken) state.valid = false; }
 
@@ -65,21 +52,13 @@ window.toggleDeduct = function(index, type) {
     let broBtn = document.getElementById(`btn-bro-${index}`);
     if (broBtn) { broBtn.className = 'btn-deduct' + (state.broken ? ' active-broken' : ''); }
 
-    // THE FIX: Validation Loop. Checks if EVERY row has at least one button selected
     let allSelected = true;
     for (let i = 0; i < deductionState.length; i++) {
-        if (!deductionState[i].valid && !deductionState[i].breached && !deductionState[i].broken) {
-            allSelected = false;
-            break;
-        }
+        if (!deductionState[i].valid && !deductionState[i].breached && !deductionState[i].broken) { allSelected = false; break; }
     }
     
-    // THE FIX: Enables the Submit button only if validation passes
     const submitBtn = document.getElementById('btn-submit-report');
-    if (submitBtn) {
-        submitBtn.disabled = !allSelected;
-        submitBtn.style.opacity = allSelected ? '1' : '0.5';
-    }
+    if (submitBtn) { submitBtn.disabled = !allSelected; submitBtn.style.opacity = allSelected ? '1' : '0.5'; }
 }
 
 window.submitDeduction = function() {
@@ -93,12 +72,12 @@ window.submitDeduction = function() {
         if (!state.valid && !state.breached && !state.broken) { alert("Please complete all Guesses before submitting!"); return; }
         
         let trueBreached = false; let trueBroken = false; let label = "";
-        let isRealRobotMove = pair.isMove && pair.rItem && !pair.rItem.virtual;
+        let isRealRobotMove = pair.isMove && !pair.rItem.virtual;
         
         if (pair.isMove) {
-            label = pair.pItem ? pair.pItem.label : "Inserted Code";
-            let pVal = pair.pItem ? pair.pItem.value : undefined;
-            let rVal = pair.rItem ? pair.rItem.value : undefined;
+            label = pair.pItem ? pair.pItem.label : "Instruction";
+            let pVal = pair.pItem.value;
+            let rVal = pair.rItem.value;
             trueBreached = (pVal !== rVal);
 
             if (isRealRobotMove) { trueBroken = (window.runtimeFailures && window.runtimeFailures[rIndexTracker] === true); rIndexTracker++; }

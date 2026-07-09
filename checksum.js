@@ -1,6 +1,3 @@
-var selLeft = null;
-var selRight = null;
-
 window.openChecksum = function() { document.getElementById('checksum-overlay').style.display = 'flex'; }
 window.closeChecksum = function() { document.getElementById('checksum-overlay').style.display = 'none'; }
 
@@ -10,99 +7,151 @@ function pseudoHash(id, val) {
     return '0x' + ('00000000' + (hash >>> 0).toString(16)).slice(-8).toUpperCase();
 }
 
+let checkedBlocks = new Set();
+
 window.renderChecksumLists = function() {
     checksRemaining = 3;
+    checkedBlocks.clear();
     document.getElementById('checks-counter').innerText = `CHECKS REMAINING: ${checksRemaining}`;
     
-    const grid = document.querySelector('.checksum-grid');
-    while (grid.children.length > 3) { grid.removeChild(grid.lastChild); }
+    document.getElementById('checksum-list-view').style.display = 'block';
+    document.getElementById('checksum-anim-view').style.display = 'none';
     
-    let moveIndex = 0; // live counter for move rows only -- see note below
-
-    for(let i=0; i<auditPairs.length; i++) {
-        let pair = auditPairs[i];
-        // Hash against the row index `i`, not pItem.id/rItem.id. Those ids
-        // (e.g. "MOVE_0", "MOVE_1") are just each item's DOM position at
-        // capture time, which shifts whenever something is inserted or
-        // deleted elsewhere in the sequence -- even for a move nobody
-        // touched. auditPairs already did the real identity-alignment work
-        // upstream, so all this hash needs to check is "same value in the
-        // same (already-matched) row", and `i` is guaranteed identical for
-        // both sides of that row.
-        let pHash = pair.pItem ? pseudoHash(i, pair.pItem.value) : "0x00000000";
-        let rHash = pair.rItem ? pseudoHash(i, pair.rItem.value) : "0x00000000";
-
-        // Same fix as deduction.js: pItem.label/rItem.label are stale,
-        // position-based labels frozen at capture time (e.g. "Instruction
-        // [0]" because that move was 1st in the list *when it was
-        // captured*). A move's position can shift between Phase 1 and
-        // Phase 3 just from insertions/deletions elsewhere, so reading
-        // either side's stored label produces duplicate/wrong numbers.
-        // Settings rows are unaffected -- their label is a real fixed name
-        // ("Forward Speed"), not a position-derived one.
-        let leftLabel;
-        if (pair.isMove) {
-            leftLabel = `Instruction [${moveIndex}]`;
-            moveIndex++;
-        } else {
-            leftLabel = pair.pItem.label;
+    const closeBtn = document.getElementById('btn-close-diagnostics');
+    if (closeBtn) closeBtn.style.display = 'block';
+    
+    const container = document.getElementById('checksum-blocks');
+    container.innerHTML = '';
+    
+    let moveIndex = 0;
+    let hasShownDivider = false;
+    
+    auditPairs.forEach((pair, index) => {
+        // Inject divider before the first setting
+        if (!pair.isMove && !hasShownDivider) {
+            let divider = document.createElement('div');
+            divider.style.borderTop = "1px dashed var(--border-color)";
+            divider.style.margin = "10px 0 5px 0";
+            divider.style.paddingTop = "10px";
+            divider.style.color = "#aaa";
+            divider.style.fontSize = "0.9em";
+            divider.innerText = "// MOTOR_CONSTANTS";
+            container.appendChild(divider);
+            hasShownDivider = true;
         }
-        let leftValue = pair.pItem ? pair.pItem.value : pair.rItem.value;
-
-        let leftDiv = document.createElement('div');
-        leftDiv.className = 'mem-block';
-        leftDiv.innerHTML = `<span>${leftLabel}: <span style="color:#e0e0e0;">${leftValue}</span></span><span class="hash-text">${pair.pItem ? pHash : rHash}</span>`;
         
-        let arrowDiv = document.createElement('div'); arrowDiv.className = 'match-arrow'; arrowDiv.innerText = '↔'; arrowDiv.id = `arrow-${i}`;
-
-        let rightDiv = document.createElement('div'); rightDiv.className = 'mem-block';
-        if (pair.rItem) { rightDiv.innerHTML = `<span>Encrypted Block [${i}]</span><span class="hash-text">[ SELECT ]</span>`; } 
-        else { rightDiv.innerHTML = `<span><span style="color:#e0e0e0;">[ DELETED BY HACKER ]</span></span><span class="hash-text">[ SELECT ]</span>`; }
+        let block = document.createElement('div');
+        block.className = 'mem-block';
+        block.id = `audit-block-${index}`;
         
-        leftDiv.onclick = () => window.selectBlock('left', i, pHash, leftDiv, arrowDiv);
-        rightDiv.onclick = () => window.selectBlock('right', i, rHash, rightDiv, arrowDiv);
+        // Format label differently for moves vs settings
+        let label = pair.isMove ? `Instruction [${moveIndex}] : ${pair.pItem.value}` : `${pair.pItem.label} : ${pair.pItem.value}`;
         
-        grid.appendChild(leftDiv); grid.appendChild(arrowDiv); grid.appendChild(rightDiv);
-    }
-    selLeft = null; selRight = null;
+        block.innerHTML = `<span>${label}</span> <span class="hash-text" style="color: #888;">[ UNAUDITED ]</span>`;
+        
+        block.onclick = () => window.inspectMove(index, pair);
+        container.appendChild(block);
+        
+        if (pair.isMove) moveIndex++;
+    });
 }
 
-window.selectBlock = function(side, index, hash, element, arrow) {
-    if (checksRemaining <= 0) return;
-
-    if (side === 'left') {
-        if (selLeft) selLeft.el.classList.remove('selected');
-        selLeft = { index, hash, el: element, arrow: arrow }; element.classList.add('selected');
-    } else {
-        if (selRight) selRight.el.classList.remove('selected');
-        selRight = { index, hash, el: element, arrow: arrow }; element.classList.add('selected');
-    }
-
-    if (selLeft && selRight) {
-        checksRemaining--;
-        document.getElementById('checks-counter').innerText = `CHECKS REMAINING: ${checksRemaining}`;
-
-        if (selLeft.index !== selRight.index) {
-            selLeft.el.querySelector('.hash-text').innerText = selLeft.hash + " [ MISMATCH ]";
-            selRight.el.querySelector('.hash-text').innerText = selRight.hash + " [ MISMATCH ]";
-            selLeft.el.classList.add('match-fail'); selRight.el.classList.add('match-fail');
-        } 
-        else if (selLeft.hash === selRight.hash && selLeft.hash !== "0x00000000") {
-            selLeft.el.querySelector('.hash-text').innerText = selLeft.hash + " [ VERIFIED ]";
-            selRight.el.querySelector('.hash-text').innerText = selRight.hash + " [ VERIFIED ]";
-            selLeft.el.classList.add('match-success'); selRight.el.classList.add('match-success'); selLeft.arrow.classList.add('success');
-        } 
-        else {
-            selLeft.el.querySelector('.hash-text').innerText = selLeft.hash + " [ BREACHED ]";
-            selRight.el.querySelector('.hash-text').innerText = selRight.hash + " [ BREACHED ]";
-            selLeft.el.classList.add('match-fail'); selRight.el.classList.add('match-fail'); selLeft.arrow.classList.add('fail');
-        }
+window.inspectMove = function(index, pair) {
+    if (checkedBlocks.has(index)) return; 
+    if (checksRemaining <= 0) { alert("SYSTEM LOCKED: NO CHECKS REMAINING!"); return; }
+    
+    checksRemaining--;
+    document.getElementById('checks-counter').innerText = `CHECKS REMAINING: ${checksRemaining}`;
+    checkedBlocks.add(index);
+    
+    const closeBtn = document.getElementById('btn-close-diagnostics');
+    if (closeBtn) closeBtn.style.display = 'none';
+    
+    document.getElementById('checksum-list-view').style.display = 'none';
+    document.getElementById('checksum-anim-view').style.display = 'flex';
+    document.getElementById('btn-anim-back').style.opacity = '0';
+    document.getElementById('btn-anim-back').style.pointerEvents = 'none';
+    document.getElementById('anim-result').innerText = '';
+    
+    // Format animation values differently for moves vs settings
+    document.getElementById('anim-p-val').innerText = pair.isMove ? pair.pItem.value : `${pair.pItem.id}=${pair.pItem.value}`;
+    document.getElementById('anim-r-val').innerText = "?????";
+    
+    let pHashEl = document.getElementById('anim-p-hash');
+    let rHashEl = document.getElementById('anim-r-hash');
+    
+    // Extract proper IDs for the hash calculation
+    let pId = pair.isMove ? pair.pItem.moveId : pair.pItem.id;
+    let rId = pair.isMove ? (pair.rItem.virtual ? "VIRTUAL" : pair.rItem.moveId) : pair.rItem.id;
+    
+    let targetPHash = pseudoHash(pId, pair.pItem.value);
+    let targetRHash = (pair.isMove && pair.rItem.virtual) ? "0xDEADDEAD" : pseudoHash(rId, pair.rItem.value);
+    let rActualVal = (pair.isMove && pair.rItem.virtual) ? "[ DELETED ]" : (pair.isMove ? pair.rItem.value : `${pair.rItem.id}=${pair.rItem.value}`);
+    
+    let startTime = Date.now();
+    let animInterval = setInterval(() => {
+        let pRand = '0x' + Math.floor(Math.random()*4294967295).toString(16).padStart(8, '0').toUpperCase();
+        let rRand = '0x' + Math.floor(Math.random()*4294967295).toString(16).padStart(8, '0').toUpperCase();
+        pHashEl.innerText = pRand;
+        rHashEl.innerText = rRand;
         
-        selLeft.el.classList.remove('selected'); selRight.el.classList.remove('selected');
-        selLeft = null; selRight = null;
-
-        if (checksRemaining <= 0) {
-            document.querySelectorAll('.mem-block:not(.match-success):not(.match-fail)').forEach(el => { el.style.pointerEvents = 'none'; el.style.opacity = '0.4'; });
+        if (Date.now() - startTime >= 1500) {
+            clearInterval(animInterval);
+            pHashEl.innerText = targetPHash;
+            rHashEl.innerText = targetRHash;
+            document.getElementById('anim-r-val').innerText = rActualVal;
+            
+            let resEl = document.getElementById('anim-result');
+            let blockEl = document.getElementById(`audit-block-${index}`);
+            let overlay = document.getElementById('checksum-overlay'); 
+            
+            if (targetPHash === targetRHash) {
+                resEl.innerText = "VERIFIED";
+                resEl.style.color = "var(--neon-green)";
+                resEl.style.textShadow = "0 0 15px var(--neon-green)";
+                
+                blockEl.classList.add('match-success');
+                blockEl.querySelector('.hash-text').innerText = targetPHash + " [ VERIFIED ]";
+                blockEl.querySelector('.hash-text').style.color = "var(--neon-green)";
+                
+                overlay.classList.add('flash-success');
+                overlay.style.transition = 'background-color 0.1s ease';
+                overlay.style.backgroundColor = 'rgba(0, 255, 65, 0.4)';
+                setTimeout(() => { 
+                    overlay.classList.remove('flash-success');
+                    overlay.style.transition = 'background-color 0.8s ease'; 
+                    overlay.style.backgroundColor = 'rgba(0, 0, 0, 0.9)'; 
+                }, 150);
+                
+            } else {
+                resEl.innerText = "BREACHED";
+                resEl.style.color = "var(--neon-red)";
+                resEl.style.textShadow = "0 0 15px var(--neon-red)";
+                
+                blockEl.classList.add('match-fail');
+                blockEl.querySelector('.hash-text').innerText = targetRHash + " [ BREACHED ]";
+                blockEl.querySelector('.hash-text').style.color = "var(--neon-red)";
+                
+                overlay.classList.add('flash-fail');
+                overlay.style.transition = 'background-color 0.1s ease';
+                overlay.style.backgroundColor = 'rgba(255, 0, 60, 0.4)';
+                setTimeout(() => { 
+                    overlay.classList.remove('flash-fail');
+                    overlay.style.transition = 'background-color 0.8s ease'; 
+                    overlay.style.backgroundColor = 'rgba(0, 0, 0, 0.9)'; 
+                }, 150);
+            }
+            
+            document.getElementById('btn-anim-back').style.opacity = '1';
+            document.getElementById('btn-anim-back').style.pointerEvents = 'auto';
         }
-    }
+    }, 50);
+}
+
+window.backToChecksumList = function() {
+    document.getElementById('checksum-list-view').style.display = 'block';
+    document.getElementById('checksum-anim-view').style.display = 'none';
+    
+    const closeBtn = document.getElementById('btn-close-diagnostics');
+    if (closeBtn) closeBtn.style.display = 'block';
 }
