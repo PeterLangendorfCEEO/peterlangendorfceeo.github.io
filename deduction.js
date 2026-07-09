@@ -65,6 +65,7 @@ window.toggleDeduct = function(index, type) {
 window.submitDeduction = function() {
     let errors = [];
     let rIndexTracker = 0; 
+    let doubleTroubleCatches = 0;
     
     for (let i = 0; i < auditPairs.length; i++) {
         let pair = auditPairs[i];
@@ -87,10 +88,17 @@ window.submitDeduction = function() {
         }
         
         let trueValid = !trueBreached && !trueBroken;
+        let rowCorrect = true;
         
-        if (state.breached !== trueBreached) { errors.push(`[${label}] Breach status was incorrect. (Was actually ${trueBreached ? 'HACKED' : 'SAFE'})`); }
-        if (isRealRobotMove && state.broken !== trueBroken) { errors.push(`[${label}] Motor status was incorrect. (Was actually ${trueBroken ? 'FAILED' : 'WORKING'})`); }
-        if (state.valid !== trueValid && state.breached === trueBreached && state.broken === trueBroken) { errors.push(`[${label}] should have been marked VALID.`); }
+        if (state.breached !== trueBreached) { errors.push(`[${label}] Breach status was incorrect. (Was actually ${trueBreached ? 'HACKED' : 'SAFE'})`); rowCorrect = false; }
+        if (isRealRobotMove && state.broken !== trueBroken) { errors.push(`[${label}] Motor status was incorrect. (Was actually ${trueBroken ? 'FAILED' : 'WORKING'})`); rowCorrect = false; }
+        if (state.valid !== trueValid && state.breached === trueBreached && state.broken === trueBroken) { errors.push(`[${label}] should have been marked VALID.`); rowCorrect = false; }
+
+        // A "double trouble" instruction was both hacked AND mechanically
+        // broken at the same time - the hardest case to spot, since the
+        // player has to correctly flag BOTH statuses on that row. Reward
+        // it when they nail it.
+        if (trueBreached && trueBroken && rowCorrect) { doubleTroubleCatches++; }
     }
     
     window.closeDeduction(); document.getElementById('result-overlay').style.display = 'flex';
@@ -103,5 +111,12 @@ window.submitDeduction = function() {
         title.innerText = "HACKER WINS!"; title.className = "hacker-win"; desc.style.borderColor = "var(--neon-red)";
         let errorText = "<span style='color: var(--neon-red); font-weight: bold;'>BREACH SUCCESSFUL.</span>\nYour report was incorrect! The Hacker slipped through your defenses.\n\n<span style='color: white;'>ERRORS FOUND:</span>\n";
         errors.forEach(e => { errorText += "❌ " + e + "\n"; }); desc.innerHTML = errorText;
+    }
+
+    // --- Score tally ---
+    if (window.computeScore && window.playScoreTally) {
+        const instructionCount = programmerState.filter(x => x.id.startsWith('MOVE_')).length;
+        const scoreData = window.computeScore(instructionCount, errors.length, doubleTroubleCatches);
+        window.playScoreTally(scoreData);
     }
 }
