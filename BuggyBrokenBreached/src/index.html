@@ -17,7 +17,7 @@
 <body>
 
     <div id="global-timer" style="display:none; position: fixed; top: 15px; left: 20px; font-size: 1.5em; font-weight: bold; background: rgba(0,0,0,0.8); padding: 10px 20px; border: 1px solid transparent; border-radius: 4px; z-index: 10000;">[ TIME REMAINING: 00:00 ]</div>
-    <button id="btn-help" class="btn-success" style="position: fixed; top: 15px; right: 20px; width: auto; margin: 0; padding: 10px 20px; z-index: 1000; font-weight: bold; font-size: 1.1em;" onclick="window.openHelp()">❓ HOW TO PLAY</button>
+    <button id="btn-help" class="btn-success" style="position: fixed; top: 15px; right: 20px; width: auto; margin: 0; padding: 10px 20px; z-index: 1000; font-weight: bold; font-size: 1.1em;" onclick="window.openHelp()">HOW TO PLAY</button>
 
     <canvas id="matrix-bg"></canvas>
     <div id="grid-overlay"></div>
@@ -48,7 +48,7 @@
             <div class="modal-content" style="flex: 1; min-width: 400px; max-width: 600px; border-color: var(--neon-green); box-shadow: 0 0 50px rgba(0,255,65,0.15); margin: 0; text-align: center; display: flex; flex-direction: column; justify-content: center; align-items: center;">
                 <h2 style="color: var(--neon-green); margin-top: 0; text-shadow: 0 0 15px rgba(0,255,65,0.4); font-size: 2.5em;">[ PHASE 1: PROGRAMMER ]</h2>
                 <p style="color: #ccc; margin-bottom: 35px; font-size: 1.3em;">You have <strong id="time-p1" style="color: #fff;">2 minutes</strong> to build your sequence.</p>
-                <button class="btn-success" onclick="window.startPhase1()" style="font-size: 1.5em; padding: 20px; width: 100%; max-width: 400px; margin: 0 auto; display: block;">✅ PROGRAMMER: BEGIN</button>
+                <button class="btn-success" onclick="window.startPhase1()" style="font-size: 1.5em; padding: 20px; width: 100%; max-width: 400px; margin: 0 auto; display: block;">PROGRAMMER: BEGIN</button>
             </div>
         </div>
     </div>
@@ -76,7 +76,7 @@
             <div class="modal-content" style="flex: 1; min-width: 400px; max-width: 600px; border-color: var(--neon-cyan); box-shadow: 0 0 50px rgba(0,240,255,0.15); margin: 0; text-align: center; display: flex; flex-direction: column; justify-content: center; align-items: center;">
                 <h2 style="color: var(--neon-cyan); margin-top: 0; text-shadow: 0 0 15px rgba(0,240,255,0.4); font-size: 2.5em;">[ PHASE 3: EXECUTION ]</h2>
                 <p style="color: #ccc; margin-bottom: 35px; font-size: 1.3em;">You will have <strong id="time-p3" style="color: #fff;">5 minutes</strong> to investigate the run.</p>
-                <button class="btn-success" onclick="window.startPhase3()" style="font-size: 1.5em; padding: 20px; width: 100%; max-width: 400px; border-color: var(--neon-cyan); color: var(--neon-cyan); margin: 0 auto; display: block;">🔌 INITIATE LINK</button>
+                <button class="btn-success" onclick="window.startPhase3()" style="font-size: 1.5em; padding: 20px; width: 100%; max-width: 400px; border-color: var(--neon-cyan); color: var(--neon-cyan); margin: 0 auto; display: block;">INITIATE LINK</button>
             </div>
         </div>
     </div>
@@ -86,7 +86,7 @@
             <h2 style="color: var(--neon-cyan); margin-top: 0; text-shadow: 0 0 10px rgba(0,240,255,0.4);">[ SYSTEM MANUAL ]</h2>
             <div id="help-content-container" style="min-height: 200px; display: flex; flex-direction: column; justify-content: center; margin-bottom: 20px; padding: 20px; background: rgba(0,240,255,0.05); border: 1px solid var(--border-color); border-radius: 4px;">
                 <div class="help-step" id="help-step-1"><h3 style="color: var(--neon-cyan); margin-top: 0; font-size: 1.4em;">WELCOME TO THE GAME!</h3><p style="color: #ccc; line-height: 1.5; font-size: 1.1em;">This is a game for <strong>two players</strong>!<br><br>Player 1 is the <strong style="color: var(--neon-green);">Programmer</strong> who wants to make the robot move. Player 2 is the sneaky <strong style="color: var(--neon-red);">Hacker</strong> who wants to secretly mess up the robot's instructions.</p></div>
-                <div class="help-step" id="help-step-2" style="display:none;"><h3 style="color: var(--neon-green); margin-top: 0; font-size: 1.4em;">STEP 1: THE PROGRAMMER</h3><p style="color: #ccc; line-height: 1.5; font-size: 1.1em;">The <strong style="color: var(--neon-green);">Programmer</strong> builds a <strong style="color: var(--neon-green);">public</strong> movement sequence for the robot using the directional instructions.</p></div>
+                <div class="help-step" id="help-step-2" style="display:none;"><h3 style="color: var(--neon-green); margin-top: 0; font-size: 1.4em;">STEP 1: THE PROGRAMMER</h3><p style="color: #ccc; line-height: 1.5; font-size: 1.1em;">The <strong style="color: var(--neon-green);">Programmer</strong> builds a sequence of moves for the robot using the directional instructions.</p></div>
                 <div class="help-step" id="help-step-3" style="display:none;"><h3 style="color: var(--neon-red); margin-top: 0; font-size: 1.4em;">STEP 2: THE HACKER STRIKES</h3><p style="color: #ccc; line-height: 1.5; font-size: 1.1em;">The <strong style="color: var(--neon-red);">Hacker</strong> intercepts the code! The <strong style="color: var(--neon-red);">Hacker</strong> creates a <strong style="color: var(--neon-red);">secret</strong> sequence by <strong style="color: var(--neon-red);">REPLACING</strong> or <strong style="color: var(--neon-red);">DELETING</strong> the original instructions.</p></div>
                 <div class="help-step" id="help-step-4" style="display:none;"><h3 style="color: var(--neon-cyan); margin-top: 0; font-size: 1.4em;">STEP 3: ROBOT EXECUTION</h3><p style="color: #ccc; line-height: 1.5; font-size: 1.1em;">The robot connects and executes the final sequence. Watch closely!<br><br>Some motors may experience spontaneous <strong style="color: #ff9d00;">MECHANICAL FAILURES</strong>. When this happens, <strong style="color: #fff;">one of the motors will break and stop turning for exactly one move</strong>.</p></div>
                 <div class="help-step" id="help-step-5" style="display:none;"><h3 style="color: #ff9d00; margin-top: 0; font-size: 1.4em;">STEP 4: DETECTIVE TOOL 1 (THE GRAPH)</h3><p style="color: #ccc; line-height: 1.5; font-size: 1.1em;">The <strong>Sensor Graph</strong> shows how fast the wheels spun. If a line drops to ZERO when it was supposed to be moving, that motor is mechanically <strong style="color: #ff9d00;">BROKEN</strong>!</p></div>
@@ -332,7 +332,7 @@
                             <div class="setting-row"><span style="width: 140px; text-align: left;">LEFT_SPEED:</span><select id="lft_spd"><option value="3">3</option><option value="7">7</option><option value="10" selected>10</option></select></div>
                             <div class="setting-row"><span style="width: 140px; text-align: left;">LEFT_ANGLE:</span><select id="lft_ang"><option value="0">0</option><option value="-45">-45</option><option value="-90" selected>-90</option><option value="-180">-180</option></select></div>
                         </div>
-                        <button onclick="window.goToPhase3(event)" class="btn-danger" style="margin-top: 20px; font-size: 1.2em; padding: 15px; width: 100%;">🚀 FINALIZE PAYLOAD</button>
+                        <button onclick="window.goToPhase3(event)" class="btn-danger" style="margin-top: 20px; font-size: 1.2em; padding: 15px; width: 100%;">FINALIZE PAYLOAD</button>
                     </div>
                 </div>
             </div>

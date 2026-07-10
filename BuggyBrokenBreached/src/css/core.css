@@ -232,20 +232,6 @@ body.hacker-mode button:hover:not(.btn-success):not(:disabled) {
 }
 body.hacker-mode .btn-success { background: linear-gradient(180deg, rgba(255, 46, 91, 0.10), rgba(255, 46, 91, 0.02)); }
 
-/* --- CSS INJECTED ICONOGRAPHY --- */
-#btn-forward::before { content: "▲"; font-size: 1.2em; }
-#btn-back::before { content: "▼"; font-size: 1.2em; }
-#btn-left::before { content: "◀"; font-size: 1.2em; }
-#btn-right::before { content: "▶"; font-size: 1.2em; }
-#btn-remove::before { content: "✖"; font-size: 1.2em; }
-#btn-clear::before { content: "🗑"; font-size: 1.2em; }
-#btn-diagnostics::before { content: "🔍"; font-size: 1.2em; }
-#btn-sensors::before { content: "📊"; font-size: 1.2em; }
-#btn-deduction::before { content: "📋"; font-size: 1.2em; }
-#btn-begin::before { content: "🚀"; font-size: 1.2em; }
-#btn-connect::before { content: "🔌"; font-size: 1.2em; }
-#btn-help::before { content: "❓"; font-size: 1.2em; }
-
 /* Grid specific sizing */
 .btn-grid {
     display: grid;
