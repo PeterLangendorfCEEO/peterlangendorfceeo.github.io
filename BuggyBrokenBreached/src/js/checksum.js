@@ -10,7 +10,7 @@ function pseudoHash(id, val) {
 let checkedBlocks = new Set();
 
 window.renderChecksumLists = function() {
-    checksRemaining = 3;
+    checksRemaining = window.DIFF_CONFIG[window.DIFFICULTY].checks;
     checkedBlocks.clear();
     document.getElementById('checks-counter').innerText = `CHECKS REMAINING: ${checksRemaining}`;
     
@@ -23,7 +23,6 @@ window.renderChecksumLists = function() {
     const container = document.getElementById('checksum-blocks');
     container.innerHTML = '';
     
-    // THE FIX: Start index at 1
     let moveIndex = 1;
     let hasShownDivider = false;
     

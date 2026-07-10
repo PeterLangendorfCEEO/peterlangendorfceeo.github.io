@@ -1,17 +1,15 @@
 window.openDeduction = function() {
     document.getElementById('deduction-overlay').style.display = 'flex';
     const container = document.getElementById('deduction-list');
-    
     const submitBtn = document.getElementById('btn-submit-report');
-    if (submitBtn) { submitBtn.disabled = true; submitBtn.style.opacity = '0.5'; }
     
     if (container.children.length === 0) {
         deductionState = [];
-        // THE FIX: Start index at 1
         let moveIndex = 1;
         
         auditPairs.forEach((pair, index) => {
-            deductionState.push({ valid: false, breached: false, broken: false });
+            // THE FIX: Set valid to TRUE by default
+            deductionState.push({ valid: true, breached: false, broken: false });
             
             let isMove = pair.isMove;
             let displayValue = pair.pItem ? pair.pItem.value : "Unknown";
@@ -26,8 +24,9 @@ window.openDeduction = function() {
             
             let html = `<div class="deduction-label" style="width: 30%;">${displayLabel}<br><span style="font-size: 0.8em; color: #888;">${displayValue}</span></div>`;
             
+            // THE FIX: Appended 'active-valid' default styling class to the VALID button so it appears highlighted immediately
             html += `<div class="deduction-group" style="flex: 1; display: flex; gap: 10px;">
-                <button class="btn-deduct" id="btn-val-${index}" onclick="window.toggleDeduct(${index}, 'valid')">VALID</button>
+                <button class="btn-deduct active-valid" id="btn-val-${index}" onclick="window.toggleDeduct(${index}, 'valid')">VALID</button>
                 <button class="btn-deduct" id="btn-bre-${index}" onclick="window.toggleDeduct(${index}, 'breached')">BREACHED</button>`;
             
             if (isRealRobotMove) { html += `<button class="btn-deduct" id="btn-bro-${index}" onclick="window.toggleDeduct(${index}, 'broken')">BROKEN</button>`; } 
@@ -35,6 +34,22 @@ window.openDeduction = function() {
             
             html += `</div>`; div.innerHTML = html; container.appendChild(div);
         });
+    }
+
+    let allSelected = false;
+    if (deductionState && deductionState.length > 0) {
+        allSelected = true;
+        for (let i = 0; i < deductionState.length; i++) {
+            if (!deductionState[i].valid && !deductionState[i].breached && !deductionState[i].broken) { 
+                allSelected = false; 
+                break; 
+            }
+        }
+    }
+    
+    if (submitBtn) { 
+        submitBtn.disabled = !allSelected; 
+        submitBtn.style.opacity = allSelected ? '1' : '0.5'; 
     }
 }
 
@@ -63,6 +78,8 @@ window.toggleDeduct = function(index, type) {
 }
 
 window.submitDeduction = function() {
+    if (window.stopTimer) window.stopTimer();
+
     let errors = [];
     let rIndexTracker = 0; 
     let doubleTroubleCatches = 0;
@@ -71,7 +88,9 @@ window.submitDeduction = function() {
         let pair = auditPairs[i];
         let state = deductionState[i];
         
-        if (!state.valid && !state.breached && !state.broken) { alert("Please complete all Guesses before submitting!"); return; }
+        if (!state.valid && !state.breached && !state.broken) { 
+            state.valid = true; 
+        }
         
         let trueBreached = false; let trueBroken = false; let label = "";
         let isRealRobotMove = pair.isMove && !pair.rItem.virtual;
@@ -94,10 +113,6 @@ window.submitDeduction = function() {
         if (isRealRobotMove && state.broken !== trueBroken) { errors.push(`[${label}] Motor status was incorrect. (Was actually ${trueBroken ? 'FAILED' : 'WORKING'})`); rowCorrect = false; }
         if (state.valid !== trueValid && state.breached === trueBreached && state.broken === trueBroken) { errors.push(`[${label}] should have been marked VALID.`); rowCorrect = false; }
 
-        // A "double trouble" instruction was both hacked AND mechanically
-        // broken at the same time - the hardest case to spot, since the
-        // player has to correctly flag BOTH statuses on that row. Reward
-        // it when they nail it.
         if (trueBreached && trueBroken && rowCorrect) { doubleTroubleCatches++; }
     }
     
@@ -113,7 +128,6 @@ window.submitDeduction = function() {
         errors.forEach(e => { errorText += "❌ " + e + "\n"; }); desc.innerHTML = errorText;
     }
 
-    // --- Score tally ---
     if (window.computeScore && window.playScoreTally) {
         const instructionCount = programmerState.filter(x => x.id.startsWith('MOVE_')).length;
         const scoreData = window.computeScore(instructionCount, errors.length, doubleTroubleCatches);

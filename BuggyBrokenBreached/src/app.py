@@ -1,52 +1,44 @@
 from pyodide.ffi import create_proxy, to_js
 from pyscript import document, window
-import random
-import asyncio
-import time
-import json
-
-ENGINE_FAILURE_CHANCE = 10
-DIR_CW = 0
-DIR_CCW = 1
+import random, asyncio, time
 
 is_connected = False
 move_id_counter = 0
 
-def normalize_angle(angle):
-    if angle > 180: return angle - 360
-    elif angle < -180: return angle + 360
-    else: return angle
+def normalize_angle(angle): return angle - 360 if angle > 180 else (angle + 360 if angle < -180 else angle)
 
-def print_term(message, color="lime"):
-    terminal = document.querySelector("#terminal")
-    if terminal:
-        terminal.innerHTML += f"<span style='color:{color};'>{message}</span><br>"
-        terminal.scrollTop = terminal.scrollHeight
+def print_term(msg, color="lime"):
+    t = document.querySelector("#terminal")
+    if t: t.innerHTML += f"<span style='color:{color};'>{msg}</span><br>"; t.scrollTop = t.scrollHeight
 
-def set_status(message, color="lime"):
-    terminal = document.querySelector("#terminal")
-    if terminal:
-        terminal.innerHTML = f"<span style='color:{color};'>{message}</span><br>"
+def set_status(msg, color="lime"):
+    t = document.querySelector("#terminal")
+    if t: t.innerHTML = f"<span style='color:{color};'>{msg}</span><br>"
 
 def update_status():
-    listbox = document.querySelector("#move-listbox")
-    if listbox and listbox.children.length == 0:
-        set_status("Add a move to begin...")
-    elif not is_connected:
-        set_status("Connect a motor to begin...")
-    else:
-        set_status("Ready to execute!", color="#00ffcc")
+    lb = document.querySelector("#move-listbox")
+    if not is_connected: set_status("Connect a motor to start the sequence", "yellow")
+    elif lb and lb.children.length == 0: set_status("Add a move to begin...", "lime")
+    else: set_status("Ready to execute!", "#00ffcc")
+    if hasattr(window, 'syncProgrammerButtons'): window.syncProgrammerButtons()
 
 def add_move(move):
     global move_id_counter
-    listbox = document.querySelector("#move-listbox")
-    if not listbox: return
+    lb = document.querySelector("#move-listbox")
+    if not lb: return
     
+    cfg = window.DIFF_CONFIG.to_py()[window.DIFFICULTY]
+    if window.currentPhase == 1 and lb.children.length >= cfg["pMax"]:
+        set_status(f"[PROGRAMMER ERROR] Max sequence length of {cfg['pMax']} reached!", "orange")
+        return
+
     if window.currentPhase == 2:
-        selected_items = document.querySelectorAll(".list-item.selected")
-        if selected_items.length == 1:
+        sel = document.querySelectorAll(".list-item.selected")
+        if sel.length == 1:
+            if hasattr(window, 'canHackerChange') and not window.canHackerChange(): return
+            if hasattr(window, 'registerHackerChange'): window.registerHackerChange()
             if hasattr(window, 'saveHackerState'): window.saveHackerState()
-            item = selected_items.item(0)
+            item = sel.item(0)
             item.innerText = move.lower()
             item.classList.remove('selected')
             if hasattr(window, 'logHackerAction'): window.logHackerAction(f"mem.ovr @ptr={item.getAttribute('data-move-id')} !val={move.upper()}")
@@ -61,182 +53,127 @@ def add_move(move):
     item.innerText = move.lower()
     item.setAttribute("data-move-id", str(move_id_counter))
     move_id_counter += 1
-    listbox.appendChild(item)
+    lb.appendChild(item)
     update_status()
 
 def remove_selected(event):
-    selected_items = document.querySelectorAll(".list-item.selected")
-    if selected_items.length > 0:
-        if window.currentPhase == 2 and hasattr(window, 'saveHackerState'): window.saveHackerState()
-        for i in range(selected_items.length):
+    sel = document.querySelectorAll(".list-item.selected")
+    if sel.length > 0:
+        if window.currentPhase == 2:
+            if hasattr(window, 'canHackerChange') and not window.canHackerChange(): return
+            if hasattr(window, 'registerHackerChange'): window.registerHackerChange()
+            if hasattr(window, 'saveHackerState'): window.saveHackerState()
+        for i in range(sel.length):
             if window.currentPhase == 2 and hasattr(window, 'logHackerAction'):
-                ptr = selected_items.item(i).getAttribute('data-move-id')
-                window.logHackerAction(f"mem.free @ptr={ptr}")
-            selected_items.item(i).remove()
+                window.logHackerAction(f"mem.free @ptr={sel.item(i).getAttribute('data-move-id')}")
+            sel.item(i).remove()
         if hasattr(window, 'syncSettings'): window.syncSettings()
         if hasattr(window, 'syncHackerButtons'): window.syncHackerButtons()
         update_status()
 
 def clear_all(event):
     if window.currentPhase == 2: return 
-    listbox = document.querySelector("#move-listbox")
-    if listbox: listbox.innerHTML = ""
+    lb = document.querySelector("#move-listbox")
+    if lb: lb.innerHTML = ""
     update_status()
 
 async def connect_motor(event):
     global is_connected
-    print_term("Triggering Web Bluetooth Pairing Menu...", color="yellow")
-    
-    btn_connect = document.querySelector("#btn-connect")
-    btn_connect.innerText = "CONNECTING..."
-    btn_connect.setAttribute("disabled", "true")
-    btn_connect.setAttribute("style", "color: var(--neon-cyan) !important; border-color: var(--neon-cyan) !important; opacity: 0.8 !important;")
-    
+    print_term("Triggering Web Bluetooth Pairing Menu...", "yellow")
+    btn = document.querySelector("#btn-connect")
+    btn.innerText = "CONNECTING..."
+    btn.setAttribute("style", "width:auto; margin:0; padding:8px 20px; font-size:0.9em; color:var(--neon-cyan) !important; border-color:var(--neon-cyan) !important; opacity:0.8 !important;")
     device_name = await window.legoBluetooth.connectHub()
     
     if not device_name or device_name == False:
-        print_term("Connection failed or cancelled.", color="red")
+        print_term("Connection failed or cancelled.", "red")
         is_connected = False
-        btn_connect.innerText = "Connect Motor via Bluetooth"
-        btn_connect.removeAttribute("disabled")
-        btn_connect.removeAttribute("style")
+        btn.innerText = "Connect Motor via Bluetooth"
+        btn.removeAttribute("disabled")
+        btn.setAttribute("style", "width:auto; margin:0; padding:8px 20px; font-size:0.9em; border-color:var(--neon-cyan); color:var(--neon-cyan); background:transparent;")
         document.querySelector("#btn-begin").setAttribute("disabled", "true")
         return
 
     is_connected = True
-    print_term(f"Handshake complete! Bound to {device_name}.", color="#00ffcc")
+    print_term(f"Handshake complete! Bound to {device_name}.", "#00ffcc")
     await asyncio.sleep(1)
-
     document.querySelector("#btn-begin").removeAttribute("disabled")
-    btn_connect.innerText = "CONNECTED"
-    btn_connect.setAttribute("style", "margin-top: 0; color: var(--neon-cyan) !important; border-color: var(--neon-cyan) !important; opacity: 0.5 !important; background: rgba(0, 240, 255, 0.1) !important;")
-    
+    btn.innerText = "CONNECTED"
+    btn.setAttribute("style", "width:auto; margin:0; padding:8px 20px; font-size:0.9em; color:var(--neon-cyan) !important; border-color:var(--neon-cyan) !important; opacity:0.5 !important; background:rgba(0,240,255,0.1) !important;")
     hw_id = document.getElementById("hardware-id")
-    if hw_id:
-        hw_id.innerText = str(device_name).upper()
-        hw_id.style.color = "var(--neon-cyan)"
+    if hw_id: hw_id.innerText = str(device_name).upper(); hw_id.style.color = "var(--neon-cyan)"
+    update_status()
 
 async def run_sequence(event):
-    if not is_connected:
-        update_status()
-        return
+    if not is_connected: update_status(); return
+    btn = document.querySelector("#btn-begin")
+    btn.setAttribute("disabled", "true")
+    btn.innerText = "EXECUTING..."
+    btn.setAttribute("style", "color:var(--neon-cyan) !important; border-color:var(--neon-cyan) !important; opacity:0.8 !important; background:transparent !important;")
 
-    btn_begin = document.querySelector("#btn-begin")
-    btn_begin.setAttribute("disabled", "true")
-    btn_begin.innerText = "EXECUTING..."
-    btn_begin.setAttribute("style", "color: var(--neon-cyan) !important; border-color: var(--neon-cyan) !important; opacity: 0.8 !important; background: transparent !important;")
+    for tid in ["#btn-diagnostics", "#btn-sensors", "#btn-deduction"]:
+        if document.querySelector(tid): document.querySelector(tid).setAttribute("disabled", "true")
 
-    if document.querySelector("#btn-diagnostics"): document.querySelector("#btn-diagnostics").setAttribute("disabled", "true")
-    if document.querySelector("#btn-sensors"): document.querySelector("#btn-sensors").setAttribute("disabled", "true")
-    if document.querySelector("#btn-deduction"): document.querySelector("#btn-deduction").setAttribute("disabled", "true")
+    lb = document.querySelector("#move-listbox")
+    moves = [lb.children.item(i) for i in range(lb.children.length)]
+    sets = { "forward_speed": document.querySelector("#fwd_spd").value, "backward_speed": document.querySelector("#bck_spd").value, "right_speed": document.querySelector("#rgt_spd").value, "left_speed": document.querySelector("#lft_spd").value, "right_angle": document.querySelector("#rgt_ang").value, "left_angle": document.querySelector("#lft_ang").value }
 
-    listbox = document.querySelector("#move-listbox")
-    move_count = listbox.children.length
-
-    settings = {
-        "forward_speed": document.querySelector("#fwd_spd").value,
-        "backward_speed": document.querySelector("#bck_spd").value,
-        "right_speed": document.querySelector("#rgt_spd").value,
-        "left_speed": document.querySelector("#lft_spd").value,
-        "right_angle": document.querySelector("#rgt_ang").value,
-        "left_angle": document.querySelector("#lft_ang").value,
-    }
-
-    failures_list = []
-    for _ in range(move_count):
-        failed = False
-        if random.randint(1, 100) <= ENGINE_FAILURE_CHANCE:
-            failed = True
-        failures_list.append(failed)
+    fail_chance = window.DIFF_CONFIG.to_py()[window.DIFFICULTY]["failChance"]
+    fails = [True if random.randint(1, 100) <= fail_chance else False for _ in moves]
+    window.runtimeFailures = to_js(fails)
+    print_term("Executing sequence...", "#00ffcc")
     
-    window.runtimeFailures = to_js(failures_list)
-    print_term("Executing sequence...", color="#00ffcc")
-    
-    if hasattr(window, 'startTelemetry'):
-        window.startTelemetry()
-        window.startRecording()
-    
+    if hasattr(window, 'startTelemetry'): window.startTelemetry(); window.startRecording()
     await asyncio.sleep(1)
-    LEFT = window.legoBluetooth.MOTOR_BITS_LEFT
-    RIGHT = window.legoBluetooth.MOTOR_BITS_RIGHT
+    L_BIT, R_BIT = window.legoBluetooth.MOTOR_BITS_LEFT, window.legoBluetooth.MOTOR_BITS_RIGHT
 
-    for idx in range(move_count):
-        node = listbox.children.item(idx)
+    for idx, node in enumerate(moves):
         move = node.innerText.lower()
-        move_id = node.getAttribute("data-move-id")
-        
-        left_failed = False
-        right_failed = False
-        
-        if hasattr(window, 'getOriginalInstructionLabel'):
-            window.currentMoveLabel = window.getOriginalInstructionLabel(move_id)
-        else:
-            # THE FIX: Shifted the fallback indexing to 1-based logic
-            window.currentMoveLabel = f"Instr [{idx + 1}]"
+        if hasattr(window, 'getOriginalInstructionLabel'): window.currentMoveLabel = window.getOriginalInstructionLabel(node.getAttribute("data-move-id"))
+        else: window.currentMoveLabel = f"Instr [{idx + 1}]"
 
-        if failures_list[idx]:
-            if random.randint(1, 2) == 1: left_failed = True
-            else: right_failed = True
+        l_fail, r_fail = False, False
+        if fails[idx]: 
+            if random.randint(1, 2) == 1: l_fail = True
+            else: r_fail = True
 
         try:
             if move in ["forward", "back"]:
-                commands = []
-                if move == "forward":
-                    speed = int(settings.get("forward_speed", 100))
-                    l_tgt = speed if not left_failed else 0
-                    r_tgt = speed if not right_failed else 0
-                    if hasattr(window, 'setCurrentTargetSpeeds'): window.setCurrentTargetSpeeds(l_tgt, r_tgt)
-                    if not left_failed: commands.append({"bitMask": LEFT, "speedPercent": speed, "direction": DIR_CW, "degrees": 864})
-                    if not right_failed: commands.append({"bitMask": RIGHT, "speedPercent": speed, "direction": DIR_CCW, "degrees": 864})
-                elif move == "back":
-                    speed = int(settings.get("backward_speed", 100))
-                    l_tgt = -speed if not left_failed else 0
-                    r_tgt = -speed if not right_failed else 0
-                    if hasattr(window, 'setCurrentTargetSpeeds'): window.setCurrentTargetSpeeds(l_tgt, r_tgt)
-                    if not left_failed: commands.append({"bitMask": LEFT, "speedPercent": speed, "direction": DIR_CCW, "degrees": 900})
-                    if not right_failed: commands.append({"bitMask": RIGHT, "speedPercent": speed, "direction": DIR_CW, "degrees": 900})
+                cmds = []
+                spd = int(sets.get(f"{move}_speed", 100))
+                l_tgt, r_tgt = (spd if not l_fail else 0), (spd if not r_fail else 0)
+                if move == "back": l_tgt, r_tgt = -l_tgt, -r_tgt
+                if hasattr(window, 'setCurrentTargetSpeeds'): window.setCurrentTargetSpeeds(l_tgt, r_tgt)
+                
+                fwd_dcw, fwd_dccw, fdeg, bdeg = 0, 1, 864, 900
+                ldir = fwd_dcw if move == "forward" else fwd_dccw
+                rdir = fwd_dccw if move == "forward" else fwd_dcw
+                deg = fdeg if move == "forward" else bdeg
 
-                if len(commands) > 0:
-                    js_commands = to_js(commands, dict_converter=window.Object.fromEntries)
-                    await window.legoBluetooth.runForDegreesSynced(js_commands)
+                if not l_fail: cmds.append({"bitMask": L_BIT, "speedPercent": spd, "direction": ldir, "degrees": deg})
+                if not r_fail: cmds.append({"bitMask": R_BIT, "speedPercent": spd, "direction": rdir, "degrees": deg})
+                if len(cmds) > 0: await window.legoBluetooth.runForDegreesSynced(to_js(cmds, dict_converter=window.Object.fromEntries))
 
             elif move in ["left", "right"]:
-                target_offset = float(settings.get(f"{move}_angle", -90 if move=="left" else 90))
-                speed = int(settings.get(f"{move}_speed", 10))
-                active_bitmask = 0
-                if not left_failed: active_bitmask |= LEFT
-                if not right_failed: active_bitmask |= RIGHT
+                ang = float(sets.get(f"{move}_angle", -90 if move=="left" else 90))
+                spd = int(sets.get(f"{move}_speed", 10))
+                b_mask = (L_BIT if not l_fail else 0) | (R_BIT if not r_fail else 0)
                 
-                l_tgt = speed if not left_failed else 0
-                r_tgt = speed if not right_failed else 0
-                if hasattr(window, 'setCurrentTargetSpeeds'): window.setCurrentTargetSpeeds(l_tgt, r_tgt)
-
-                if active_bitmask > 0:
-                    turn_dir = DIR_CW if move == "left" else DIR_CCW
-                    start_angle = window.legoBluetooth.getAngle()
-                    if start_angle is None:
-                        print_term("Error: IMU data unavailable. Cannot complete turn.", color="red")
+                if hasattr(window, 'setCurrentTargetSpeeds'): window.setCurrentTargetSpeeds((spd if not l_fail else 0), (spd if not r_fail else 0))
+                if b_mask > 0:
+                    start_a = window.legoBluetooth.getAngle()
+                    if start_a is None: print_term("Error: IMU data unavailable.", "red")
                     else:
-                        target_angle = normalize_angle(start_angle + target_offset)
-                        tasks = []
-                        tasks.append(asyncio.ensure_future(window.legoBluetooth.runMotorContinuous(active_bitmask, speed, turn_dir)))
-                        for t in tasks: await t
-                        
-                        start_time = time.time()
+                        tgt_a = normalize_angle(start_a + ang)
+                        await asyncio.ensure_future(window.legoBluetooth.runMotorContinuous(b_mask, spd, 0 if move == "left" else 1))
+                        s_time = time.time()
                         while True:
-                            current = window.legoBluetooth.getAngle()
-                            if current is None: break
-                            error = abs(normalize_angle(current - target_angle))
-                            if error < 7.5: break
-                            if time.time() - start_time > 15:
-                                print_term(f"Turn timeout! Error: {error:.1f}deg", color="orange")
-                                break
+                            curr = window.legoBluetooth.getAngle()
+                            if curr is None or abs(normalize_angle(curr - tgt_a)) < 7.5: break
+                            if time.time() - s_time > 15: print_term(f"Turn timeout!", "orange"); break
                             await asyncio.sleep(0.02)
-                        
-                        await window.legoBluetooth.stopMotor(active_bitmask)
-
-        except Exception as e:
-            print_term(f"Command failed or timed out: {e}", color="red")
+                        await window.legoBluetooth.stopMotor(b_mask)
+        except Exception as e: print_term(f"Command failed: {e}", "red")
 
         window.currentMoveLabel = "IDLE"
         if hasattr(window, 'setCurrentTargetSpeeds'): window.setCurrentTargetSpeeds(0, 0)
@@ -247,38 +184,22 @@ async def run_sequence(event):
     if hasattr(window, 'stopRecording'): window.stopRecording()
     print_term("Robot move sequence complete!")
     
-    btn_begin.innerText = "EXECUTED"
-    btn_begin.setAttribute("style", "color: var(--neon-cyan) !important; border-color: var(--neon-cyan) !important; opacity: 0.5 !important; background: rgba(0, 240, 255, 0.1) !important;")
-    
-    if document.querySelector("#btn-diagnostics"): document.querySelector("#btn-diagnostics").removeAttribute("disabled")
-    if document.querySelector("#btn-sensors"): document.querySelector("#btn-sensors").removeAttribute("disabled")
-    if document.querySelector("#btn-deduction"): document.querySelector("#btn-deduction").removeAttribute("disabled")
+    btn.innerText = "EXECUTED"
+    btn.setAttribute("style", "color:var(--neon-cyan) !important; border-color:var(--neon-cyan) !important; opacity:0.5 !important; background:rgba(0,240,255,0.1) !important;")
+    for tid in ["#btn-diagnostics", "#btn-sensors", "#btn-deduction"]:
+        if document.querySelector(tid): document.querySelector(tid).removeAttribute("disabled")
+    if hasattr(window, 'startPhase3Timer'): window.startPhase3Timer()
 
 try:
-    window.localStorage.removeItem("cyber_settings")
-    window.localStorage.removeItem("cyber_moves")
-
     document.querySelector("#btn-forward").onclick = lambda e: add_move("forward")
     document.querySelector("#btn-back").onclick = lambda e: add_move("back")
     document.querySelector("#btn-left").onclick = lambda e: add_move("left")
     document.querySelector("#btn-right").onclick = lambda e: add_move("right")
     document.querySelector("#btn-remove").onclick = remove_selected
     document.querySelector("#btn-clear").onclick = clear_all
-    
-    connect_proxy = create_proxy(lambda e: asyncio.ensure_future(connect_motor(e)))
-    document.querySelector("#btn-connect").addEventListener("click", connect_proxy)
-
-    begin_proxy = create_proxy(lambda e: asyncio.ensure_future(run_sequence(e)))
-    document.querySelector("#btn-begin").addEventListener("click", begin_proxy)
+    document.querySelector("#btn-connect").addEventListener("click", create_proxy(lambda e: asyncio.ensure_future(connect_motor(e))))
+    document.querySelector("#btn-begin").addEventListener("click", create_proxy(lambda e: asyncio.ensure_future(run_sequence(e))))
     update_status()
-
-except Exception as e:
-    print_term(f"Initialization Error: {str(e)}", color="red")
+except Exception as e: print_term(f"Initialization Error: {e}", "red")
 finally:
-    if hasattr(window, 'triggerBootSequence'):
-        window.triggerBootSequence()
-    else:
-        loader = document.getElementById("loading-screen")
-        if loader: 
-            loader.classList.add("fade-out")
-            window.setTimeout(getattr(window, 'openHelp', lambda: None), 800)
+    if hasattr(window, 'triggerBootSequence'): window.triggerBootSequence()

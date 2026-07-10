@@ -29,10 +29,12 @@ function processTypingQueue() {
                 const time = `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}:${now.getSeconds().toString().padStart(2,'0')}`;
                 const historySpan = document.createElement('span');
                 historySpan.innerHTML = `<span style="color: #555;">[${time}]</span> <span style="color: var(--neon-red);">root@sys:~#</span> ${currentString}`;
+            
                 logs.appendChild(historySpan);
                 logs.scrollTop = logs.scrollHeight;
                 
-                currentString = ""; typeSpan.innerText = ""; isTyping = false; processTypingQueue();
+                currentString = ""; typeSpan.innerText = ""; isTyping = false;
+                processTypingQueue();
             }, 300); 
         }
     }, 25); 
@@ -43,7 +45,17 @@ settingsInputs.forEach(id => {
     const el = document.getElementById(id);
     if (el) { 
         el.addEventListener('focus', () => { if (currentPhase === 2) window.saveHackerState(); });
-        el.addEventListener('change', (e) => { window.logHackerAction(`env.ovr !key=${id} !val=${e.target.value}`); }); 
+        
+        el.addEventListener('change', (e) => { 
+            if (currentPhase === 2) {
+                if (window.canHackerChange && !window.canHackerChange()) {
+                    window.undoHackerAction();
+                    return;
+                }
+                if (window.registerHackerChange) window.registerHackerChange();
+                window.logHackerAction(`env.ovr !key=${id} !val=${e.target.value}`); 
+            }
+        }); 
     }
 });
 
@@ -55,9 +67,14 @@ if (window.syncSettings) window.syncSettings();
 
 const observer = new MutationObserver((mutations) => {
     if (window.syncSettings) window.syncSettings(); 
+    
+    // THE FIX: Added observer check for Phase 1 constraints!
+    if (currentPhase === 1 && window.syncProgrammerButtons) {
+        window.syncProgrammerButtons();
+    }
+    
     if (currentPhase !== 2) return;
     
-    // THE FIX: Ignore mutations if an undo command is currently firing!
     if (isDraggingMove || window.isUndoing) return; 
 
     mutations.forEach(mutation => {
@@ -75,4 +92,5 @@ const observer = new MutationObserver((mutations) => {
         }
     });
 });
+
 if (listbox) { observer.observe(listbox, { childList: true }); }

@@ -1,12 +1,3 @@
-// --- Score system ---
-// Scoring rules:
-//  + points for every instruction the programmer wrote (longer/riskier
-//    programs are worth more)
-//  - points for every mistake in the final Incident Report
-//  + bonus for every instruction correctly flagged as BOTH breached and
-//    broken at once (the hardest case to catch)
-//  + a big bonus for a flawless (zero-mistake) report
-
 window.SCORE_CONFIG = {
     perInstruction: 15,
     perMistake: -20,
@@ -42,13 +33,19 @@ window.computeScore = function(instructionCount, mistakeCount, doubleTroubleCoun
         breakdown.push({ label: `Perfect Audit Bonus`, points: cfg.perfectBonus });
     }
 
-    let total = breakdown.reduce((sum, line) => sum + line.points, 0);
-    if (total < 0) total = 0;
+    let baseTotal = breakdown.reduce((sum, line) => sum + line.points, 0);
+    if (baseTotal < 0) baseTotal = 0;
+    
+    let mult = window.DIFF_CONFIG ? window.DIFF_CONFIG[window.DIFFICULTY].mult : 1;
+    let finalTotal = baseTotal * mult;
+    
+    if (mult > 1) {
+        breakdown.push({ label: `Difficulty Multiplier (${window.DIFFICULTY.toUpperCase()})`, points: `x${mult}` });
+    }
 
-    return { breakdown, total, perfect };
+    return { breakdown, total: finalTotal, perfect };
 };
 
-// --- Styles (self-contained so this file doesn't depend on core.css) ---
 (function injectScoreStyles() {
     if (document.getElementById('score-tally-styles')) return;
     const style = document.createElement('style');
@@ -101,7 +98,7 @@ window.animateScoreCount = function(from, to, duration, onUpdate, onComplete) {
     const start = performance.now();
     function step(now) {
         const progress = Math.min(1, (now - start) / duration);
-        const eased = 1 - Math.pow(1 - progress, 3); // ease-out cubic
+        const eased = 1 - Math.pow(1 - progress, 3);
         const val = Math.round(from + (to - from) * eased);
         onUpdate(val);
         if (progress < 1) { requestAnimationFrame(step); }
@@ -122,7 +119,6 @@ window.spawnScoreConfetti = function(container) {
         const dx = (Math.random() - 0.5) * Math.max(rect.width, 300);
         const dy = 40 + Math.random() * 160;
         const rot = (Math.random() - 0.5) * 360;
-
         requestAnimationFrame(() => {
             p.style.transform = `translate(${dx}px, ${dy}px) rotate(${rot}deg)`;
             p.style.opacity = '0';
@@ -131,9 +127,6 @@ window.spawnScoreConfetti = function(container) {
     }
 };
 
-// --- Tally animation ---
-// Reveals each score line one at a time, running the total up as it goes,
-// then lands on the final number (with extra fanfare for a perfect run).
 window.playScoreTally = function(scoreData) {
     const container = document.getElementById('score-tally');
     const linesEl = document.getElementById('score-tally-lines');
@@ -151,9 +144,8 @@ window.playScoreTally = function(scoreData) {
     }
     container.style.display = 'block';
 
-    const lineDelay = 550; // ms between each line appearing
+    const lineDelay = 550;
     const lines = scoreData.breakdown;
-
     if (lines.length === 0) {
         totalEl.style.display = 'block';
         totalEl.innerText = `FINAL SCORE: ${scoreData.total}`;
@@ -165,13 +157,17 @@ window.playScoreTally = function(scoreData) {
         setTimeout(() => {
             const row = document.createElement('div');
             row.className = 'score-tally-line';
-            const sign = line.points >= 0 ? '+' : '';
-            const colorClass = line.points >= 0 ? 'score-positive' : 'score-negative';
-            row.innerHTML = `<span class="score-tally-label">${line.label}</span><span class="score-tally-value ${colorClass}">${sign}${line.points}</span>`;
+            
+            const isMult = typeof line.points === 'string';
+            const sign = (!isMult && line.points >= 0) ? '+' : '';
+            const colorClass = (!isMult && line.points < 0) ? 'score-negative' : 'score-positive';
+            const valText = isMult ? line.points : `${sign}${line.points}`;
+            
+            row.innerHTML = `<span class="score-tally-label">${line.label}</span><span class="score-tally-value ${colorClass}">${valText}</span>`;
             linesEl.appendChild(row);
             requestAnimationFrame(() => row.classList.add('score-tally-line-in'));
 
-            running += line.points;
+            if (!isMult) running += line.points;
 
             if (idx === lines.length - 1) {
                 setTimeout(() => {
