@@ -3,8 +3,8 @@
 *A 2-player local web game of programming, sabotage, and mechanical deduction.*
 
 ### 🎮 Live Demos
-* **Normal Mode:** [https://peterlangendorfceeo.github.io/BuggyBrokenBreached/src]
-* **Speed Round Mode:** [https://peterlangendorfceeo.github.io/BuggyBrokenBreached/src/?mode=speed_round]
+* [https://peterlangendorfceeo.github.io/BuggyBrokenBreached/src](**Normal Mode**)
+* [https://peterlangendorfceeo.github.io/BuggyBrokenBreached/src/?mode=speed_round](**Speed round**)
 
 ---
 
