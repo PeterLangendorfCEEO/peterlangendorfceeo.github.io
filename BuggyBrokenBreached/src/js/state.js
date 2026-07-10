@@ -10,18 +10,14 @@ window.hackerHistory = [];
 window.triggerBootSequence = function() {
     if (window.loadRules) window.loadRules();
     
+    // Allows the loader to fade smoothly out, THEN triggers the Help Menu to avoid DOM racing
     setTimeout(() => {
         const loader = document.getElementById('loading-screen');
         if (loader) {
-            // THE FIX: Open the help menu immediately behind the loading screen
-            if (window.openHelp) window.openHelp();
-            
-            // Fade out the loader to seamlessly reveal the Help menu
             loader.classList.add('fade-out');
-            
-            // Cleanup the loader element after the fade completes
-            setTimeout(() => { 
-                loader.style.display = 'none'; 
+            setTimeout(() => {
+                loader.style.display = 'none';
+                if (window.openHelp) window.openHelp();
             }, 800);
         }
     }, 3000); 
@@ -29,7 +25,9 @@ window.triggerBootSequence = function() {
 
 window.captureState = function() {
     let state = [];
-    const moves = document.getElementById('move-listbox').children;
+    const listbox = document.getElementById('move-listbox');
+    if (!listbox) return state;
+    const moves = listbox.children;
     for(let i=0; i<moves.length; i++) {
         state.push({ id: 'MOVE_' + i, moveId: moves[i].getAttribute('data-move-id'), label: `Instruction [${i + 1}]`, value: moves[i].innerText.trim().toUpperCase() });
     }
@@ -81,7 +79,10 @@ window.syncProgrammerButtons = function() {
     const listbox = document.getElementById('move-listbox');
     if (!listbox) return;
     const count = listbox.children.length;
+    
+    if (!window.DIFF_CONFIG) return;
     const cfg = window.DIFF_CONFIG[window.DIFFICULTY];
+    if (!cfg) return;
     
     const isMaxed = count >= cfg.pMax;
     const isMinMet = count >= cfg.pMin;
@@ -164,10 +165,12 @@ window.startPhase1 = function() {
     if (settingsBtn) settingsBtn.style.display = 'none';
     window.startTimer(window.DIFF_CONFIG[window.DIFFICULTY].tP1, () => { window.goToPhase2(null, true); }, 'var(--neon-green)');
 };
+
 window.startPhase2 = function() {
     document.getElementById('p2-start-overlay').style.display = 'none';
     window.startTimer(window.DIFF_CONFIG[window.DIFFICULTY].tP2, () => { window.goToPhase3(null); }, 'var(--neon-red)');
 };
+
 window.startPhase3 = function() {
     document.getElementById('p3-start-overlay').style.display = 'none';
 };

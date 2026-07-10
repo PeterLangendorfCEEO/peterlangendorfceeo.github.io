@@ -6,6 +6,7 @@ window.setAnimTimeout = function(callback, ms) {
     window.animTimeouts.push(id);
     return id;
 };
+
 window.clearAnimTimeouts = function() {
     window.animTimeouts.forEach(clearTimeout);
     window.animTimeouts = [];
@@ -69,7 +70,7 @@ window.goToPhase2 = function(event, forced = false) {
         overlay.style.display = 'flex'; scene.style.opacity = '1';
         const packet = document.getElementById('h-packet'); const hacker = document.getElementById('h-hacker');
 
-        packet.style.transition = 'none'; packet.style.left = '50px'; packet.style.transform = 'translate(-50%, -50%) scale(0)'; packet.style.filter = 'none'; 
+        packet.style.transition = 'none'; packet.style.left = '50px'; packet.style.transform = 'translate3d(-50%, -50%, 0) scale(0)'; packet.style.filter = 'none'; 
         hacker.style.transition = 'none'; hacker.style.top = '-150px'; hacker.style.opacity = '0';
         wipe.style.transition = 'none'; wipe.classList.remove('wipe-in');
         
@@ -84,7 +85,7 @@ window.goToPhase2 = function(event, forced = false) {
 
         window.setAnimTimeout(() => {
             packet.style.transition = 'left 3.0s linear, transform 0.3s cubic-bezier(0.1, 0.8, 0.3, 1)';
-            packet.style.left = '50%'; packet.style.transform = 'translate(-50%, -50%) scale(1)';
+            packet.style.left = '50%'; packet.style.transform = 'translate3d(-50%, -50%, 0) scale(1)';
 
             window.setAnimTimeout(() => {
                 hacker.style.transition = 'top 0.3s cubic-bezier(0.8, 0, 0.2, 1), opacity 0.3s';
@@ -98,10 +99,14 @@ window.goToPhase2 = function(event, forced = false) {
                     window.p1_spray = setInterval(() => {
                         for(let i=0; i<3; i++) {
                             let p = document.createElement('div'); p.className = 'h-particle'; p.innerText = Math.random() > 0.5 ? '1' : '0';
-                            p.style.left = '350px'; p.style.top = '170px';
+                            
+                            // THE FIX: Origin is now exactly the center collision point!
+                            p.style.left = '400px'; 
+                            p.style.top = '200px';
+                            
                             let angle = Math.random() * Math.PI * 2; let distance = 50 + Math.random() * 200;
                             p.style.transition = 'all 0.6s cubic-bezier(0.1, 0.9, 0.2, 1)'; document.getElementById('hijack-scene').appendChild(p); void p.offsetWidth; 
-                            p.style.transform = `translate(${Math.cos(angle) * distance}px, ${Math.sin(angle) * distance}px) scale(1.5)`; p.style.opacity = '0';
+                            p.style.transform = `translate3d(${Math.cos(angle) * distance}px, ${Math.sin(angle) * distance}px, 0) scale(1.5)`; p.style.opacity = '0';
                             window.setAnimTimeout(() => p.remove(), 600);
                         }
                         sprayCount++; if(sprayCount > 40) clearInterval(window.p1_spray); 
@@ -176,7 +181,7 @@ window.goToPhase3 = function(event) {
         overlay.style.display = 'flex'; scene.style.opacity = '1';
         
         const packet = document.getElementById('d-packet'); const bot = document.getElementById('d-bot');
-        packet.style.transition = 'none'; packet.style.left = '50px'; packet.style.transform = 'translate(-50%, -50%) scale(0)'; bot.style.filter = 'none';
+        packet.style.transition = 'none'; packet.style.left = '50px'; packet.style.transform = 'translate3d(-50%, -50%, 0) scale(0)'; bot.style.filter = 'none';
         wipe.classList.remove('wipe-in');
         
         const binaryRows = document.querySelectorAll('#d-stream .binary-row');
@@ -190,7 +195,7 @@ window.goToPhase3 = function(event) {
 
         window.setAnimTimeout(() => {
             packet.style.transition = 'left 1.5s cubic-bezier(0.4, 0, 1, 1), transform 0.2s ease-out';
-            packet.style.left = '95%'; packet.style.transform = 'translate(-50%, -50%) scale(1)';
+            packet.style.left = '95%'; packet.style.transform = 'translate3d(-50%, -50%, 0) scale(1)';
 
             window.setAnimTimeout(() => {
                 document.body.classList.add('exploding'); packet.style.opacity = '0'; bot.style.filter = 'drop-shadow(0 0 20px #ff003c) drop-shadow(0 0 30px #ff003c)';
@@ -199,12 +204,20 @@ window.goToPhase3 = function(event) {
                 window.setAnimTimeout(() => {
                     scene.style.transition = 'opacity 0.5s'; scene.style.opacity = '0';
                     window.setAnimTimeout(() => {
+                        // THE FIX: Hardened the transition trigger sequence
                         wipe.style.transition = 'none'; document.documentElement.style.setProperty('--wipe-x', '50%'); document.documentElement.style.setProperty('--wipe-y', '50%'); wipe.classList.add('wipe-in');
                         
-                        window.currentPhase = 3; window.robotState = window.captureState(); window.deductionState = []; document.getElementById('deduction-list').innerHTML = '';
+                        window.currentPhase = 3; window.robotState = window.captureState(); window.deductionState = []; 
+                        
+                        const dedList = document.getElementById('deduction-list');
+                        if(dedList) dedList.innerHTML = '';
+                        
                         window.buildAlignment(); window.renderChecksumLists();
                         
-                        document.getElementById('step-execution').style.display = 'flex'; document.body.classList.remove('hacker-mode');
+                        const stepExec = document.getElementById('step-execution');
+                        if(stepExec) stepExec.style.display = 'flex'; 
+                        
+                        document.body.classList.remove('hacker-mode');
                         if (window.clearMatrix) window.clearMatrix('#0d0d12'); window.matrixSettings.color = 'rgba(0, 255, 65, 0.4)'; window.matrixSettings.fade = 'rgba(13, 13, 18, 0.08)';
                         if (window.preRenderMatrix) window.preRenderMatrix(); if (window.applyMatrixSettings) window.applyMatrixSettings();
                         

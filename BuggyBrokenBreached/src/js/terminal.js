@@ -30,8 +30,10 @@ function processTypingQueue() {
                 const historySpan = document.createElement('span');
                 historySpan.innerHTML = `<span style="color: #555;">[${time}]</span> <span style="color: var(--neon-red);">root@sys:~#</span> ${currentString}`;
             
-                logs.appendChild(historySpan);
-                logs.scrollTop = logs.scrollHeight;
+                if (logs) {
+                    logs.appendChild(historySpan);
+                    logs.scrollTop = logs.scrollHeight;
+                }
                 
                 currentString = ""; typeSpan.innerText = ""; isTyping = false;
                 processTypingQueue();
@@ -44,12 +46,12 @@ const settingsInputs = ['fwd_spd', 'rgt_spd', 'rgt_ang', 'lft_spd', 'lft_ang', '
 settingsInputs.forEach(id => {
     const el = document.getElementById(id);
     if (el) { 
-        el.addEventListener('focus', () => { if (currentPhase === 2) window.saveHackerState(); });
+        el.addEventListener('focus', () => { if (currentPhase === 2 && window.saveHackerState) window.saveHackerState(); });
         
         el.addEventListener('change', (e) => { 
             if (currentPhase === 2) {
                 if (window.canHackerChange && !window.canHackerChange()) {
-                    window.undoHackerAction();
+                    if (window.undoHackerAction) window.undoHackerAction();
                     return;
                 }
                 if (window.registerHackerChange) window.registerHackerChange();
@@ -68,13 +70,11 @@ if (window.syncSettings) window.syncSettings();
 const observer = new MutationObserver((mutations) => {
     if (window.syncSettings) window.syncSettings(); 
     
-    // THE FIX: Added observer check for Phase 1 constraints!
     if (currentPhase === 1 && window.syncProgrammerButtons) {
         window.syncProgrammerButtons();
     }
     
     if (currentPhase !== 2) return;
-    
     if (isDraggingMove || window.isUndoing) return; 
 
     mutations.forEach(mutation => {
